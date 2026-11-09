@@ -1,0 +1,405 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#123c69">
+  <title>Mon Émargement</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f6fa;
+      color: #172033;
+    }
+
+    header {
+      background: #123c69;
+      color: white;
+      padding: 24px 20px;
+      border-radius: 0 0 24px 24px;
+    }
+
+    header h1 { margin: 0 0 8px; }
+    header p { margin: 0; opacity: .85; }
+
+    main {
+      max-width: 650px;
+      margin: auto;
+      padding: 18px;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 18px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 16px #00000008;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .stat {
+      background: #edf4ff;
+      padding: 15px;
+      border-radius: 14px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 24px;
+      color: #123c69;
+      margin-top: 5px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin: 14px 0 6px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d8deea;
+      border-radius: 10px;
+      font: inherit;
+      background: white;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 14px;
+      font: inherit;
+      font-weight: 700;
+      margin-top: 12px;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: #123c69;
+      color: white;
+    }
+
+    .secondary {
+      background: #e8eef6;
+      color: #123c69;
+    }
+
+    .session {
+      border: 1px solid #e1e6ef;
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+
+    .session h3 { margin: 0 0 8px; }
+
+    .muted {
+      color: #657187;
+      font-size: 14px;
+    }
+
+    .signed { color: #16803c; font-weight: 700; }
+    .unsigned { color: #b36a00; font-weight: 700; }
+
+    footer {
+      text-align: center;
+      color: #657187;
+      padding: 20px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>📘 Mon Émargement</h1>
+  <p>Suivi personnel de tes heures de cours</p>
+</header>
+
+<main>
+
+  <section class="card">
+    <h2>Mon résumé</h2>
+
+    <div class="stats">
+      <div class="stat">
+        Heures enseignées
+        <strong id="totalHours">0 h</strong>
+      </div>
+
+      <div class="stat">
+        Salaire estimé
+        <strong id="totalPay">0 FCFA</strong>
+      </div>
+    </div>
+
+    <p class="muted">
+      Tarif : 1 300 FCFA par heure de cours réellement dispensée.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>Nouvelle séance</h2>
+
+    <label for="date">Date du cours</label>
+    <input type="date" id="date">
+
+    <label for="arrival">Heure d'arrivée à l'école</label>
+    <input type="time" id="arrival">
+
+    <p class="muted">
+      L'heure d'arrivée est enregistrée à titre de preuve.
+      Elle n'est pas comptée dans les heures rémunérées.
+    </p>
+
+    <label for="className">Classe</label>
+    <input id="className" placeholder="Ex. : 6e, 4e, Terminale A">
+
+    <label for="subject">Matière</label>
+    <select id="subject">
+      <option>Mathématiques</option>
+      <option>Anglais</option>
+      <option>Autre</option>
+    </select>
+
+    <label for="start">Début du cours</label>
+    <input type="time" id="start">
+
+    <label for="end">Fin du cours</label>
+    <input type="time" id="end">
+
+    <label>
+      <input type="checkbox" id="signed" style="width:auto">
+      Séance signée dans le registre officiel
+    </label>
+
+    <label for="notes">Observations</label>
+    <textarea id="notes" rows="3"
+      placeholder="Remarque éventuelle..."></textarea>
+
+    <button class="primary" onclick="saveSession()">
+      Enregistrer la séance
+    </button>
+  </section>
+
+  <section class="card">
+    <h2>Historique des séances</h2>
+
+    <label for="monthFilter">Filtrer par mois</label>
+    <input type="month" id="monthFilter" onchange="render()">
+
+    <div id="history"></div>
+
+    <button class="secondary" onclick="exportCSV()">
+      Exporter mon historique CSV
+    </button>
+  </section>
+
+</main>
+
+<footer>
+  Mon Émargement — Suivi personnel des heures de cours
+</footer>
+
+<script>
+  const RATE = 1300;
+  const STORAGE_KEY = "mon_emargement_sessions";
+
+  let sessions = JSON.parse(
+    localStorage.getItem(STORAGE_KEY) || "[]"
+  );
+
+  document.getElementById("date").value =
+    new Date().toLocaleDateString("en-CA");
+
+  function getHours(start, end) {
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+
+    let minutes = (eh * 60 + em) - (sh * 60 + sm);
+
+    if (minutes <= 0) {
+      throw new Error("L'heure de fin doit être après le début.");
+    }
+
+    return minutes / 60;
+  }
+
+  function saveSession() {
+    const date = document.getElementById("date").value;
+    const arrival = document.getElementById("arrival").value;
+    const className = document.getElementById("className").value.trim();
+    const subject = document.getElementById("subject").value;
+    const start = document.getElementById("start").value;
+    const end = document.getElementById("end").value;
+    const signed = document.getElementById("signed").checked;
+    const notes = document.getElementById("notes").value.trim();
+
+    if (!date || !className || !start || !end) {
+      alert("Remplis la date, la classe et les horaires du cours.");
+      return;
+    }
+
+    let hours;
+
+    try {
+      hours = getHours(start, end);
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
+
+    sessions.push({
+      id: Date.now(),
+      date,
+      arrival,
+      className,
+      subject,
+      start,
+      end,
+      hours,
+      signed,
+      notes
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+
+    document.getElementById("className").value = "";
+    document.getElementById("arrival").value = "";
+    document.getElementById("start").value = "";
+    document.getElementById("end").value = "";
+    document.getElementById("notes").value = "";
+    document.getElementById("signed").checked = false;
+
+    render();
+    alert("Séance enregistrée !");
+  }
+
+  function render() {
+    const filter = document.getElementById("monthFilter").value;
+
+    const filtered = sessions.filter(session =>
+      !filter || session.date.startsWith(filter)
+    );
+
+    const hours = filtered.reduce(
+      (sum, session) => sum + session.hours, 0
+    );
+
+    document.getElementById("totalHours").textContent =
+      hours.toFixed(2) + " h";
+
+    document.getElementById("totalPay").textContent =
+      Math.round(hours * RATE).toLocaleString("fr-FR") + " FCFA";
+
+    const history = document.getElementById("history");
+
+    if (!filtered.length) {
+      history.innerHTML =
+        '<p class="muted">Aucune séance enregistrée.</p>';
+      return;
+    }
+
+    history.innerHTML = filtered.slice().reverse().map(session => `
+      <div class="session">
+        <h3>${escapeHTML(session.className)} — ${escapeHTML(session.subject)}</h3>
+
+        <p>${escapeHTML(session.date)}</p>
+
+        <p>
+          ${escapeHTML(session.start)} – ${escapeHTML(session.end)}
+          (${session.hours.toFixed(2)} h)
+        </p>
+
+        <p>Arrivée : ${escapeHTML(session.arrival || "Non renseignée")}</p>
+
+        <p>
+          ${session.signed
+            ? '<span class="signed">✓ Signée</span>'
+            : '<span class="unsigned">⚠ Non signée</span>'}
+        </p>
+
+        <p><strong>${Math.round(session.hours * RATE).toLocaleString("fr-FR")} FCFA</strong></p>
+
+        ${session.notes ? `<p>${escapeHTML(session.notes)}</p>` : ""}
+
+        <button class="secondary" onclick="deleteSession(${session.id})">
+          Supprimer cette séance
+        </button>
+      </div>
+    `).join("");
+  }
+
+  function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[char]));
+  }
+
+  function deleteSession(id) {
+    if (!confirm("Supprimer cette séance ?")) return;
+
+    sessions = sessions.filter(session => session.id !== id);
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    render();
+  }
+
+  function exportCSV() {
+    if (!sessions.length) {
+      alert("Aucune séance à exporter.");
+      return;
+    }
+
+    const rows = [
+      ["Date", "Arrivée", "Classe", "Matière", "Début", "Fin",
+       "Heures", "Montant FCFA", "Signée", "Observations"],
+      ...sessions.map(s => [
+        s.date, s.arrival, s.className, s.subject, s.start, s.end,
+        s.hours, Math.round(s.hours * RATE),
+        s.signed ? "Oui" : "Non", s.notes
+      ])
+    ];
+
+    const csv = "\uFEFF" + rows.map(row =>
+      row.map(value =>
+        '"' + String(value ?? "").replace(/"/g, '""') + '"'
+      ).join(";")
+    ).join("\r\n");
+
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;"
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "mon-emargement.csv";
+    link.click();
+
+    URL.revokeObjectURL(url);
+  }
+
+  render();
+</script>
+
+</body>
+</html>
