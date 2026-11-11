@@ -12,7 +12,7 @@ header{background:#123c69;color:white;padding:24px 20px;border-radius:0 0 24px 2
 header h1{margin:0 0 8px}header p{margin:0;opacity:.85}
 main{max-width:650px;margin:auto;padding:18px}
 .card{background:white;padding:20px;border-radius:18px;margin-bottom:18px;box-shadow:0 4px 16px #00000008}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
 .stat{background:#edf4ff;padding:15px;border-radius:14px}
 .stat strong{display:block;font-size:24px;color:#123c69;margin-top:5px}
 label{display:block;font-weight:600;margin:14px 0 6px}
@@ -21,12 +21,19 @@ button{width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-wei
 .primary{background:#123c69;color:white}.secondary{background:#e8eef6;color:#123c69}
 .session{border:1px solid #e1e6ef;border-radius:12px;padding:14px;margin-top:12px}
 .session h3{margin:0 0 8px}
-.day-heading{margin:22px 0 4px;padding-bottom:8px;border-bottom:2px solid #edf1f7;color:#123c69;font-size:15px;text-transform:uppercase;letter-spacing:.3px}
+.day-heading{margin:22px 0 4px;padding-bottom:8px;border-bottom:2px solid #edf1f7;color:#6b4bb8;font-size:15px;text-transform:uppercase;letter-spacing:.3px}
 .day-heading:first-child{margin-top:12px}
 .muted{color:#657187;font-size:14px}
 .signed{color:#16803c;font-weight:700}.unsigned{color:#b36a00;font-weight:700}
 .rate-note{background:#edf4ff;color:#123c69;border-radius:10px;padding:11px 12px;margin-top:12px;font-size:14px}
+.balance-box{background:#edf4ff;border-radius:14px;padding:16px;margin-top:16px}
+.balance-amount{display:block;color:#123c69;font-size:28px;font-weight:800;margin-top:5px}
+.balance-meta{display:flex;justify-content:space-between;gap:12px;margin-top:12px;font-size:14px;color:#657187}
+.payment-form{border:1px solid #e1e6ef;border-radius:12px;padding:14px;margin-top:12px}
+.payment-item{border:1px solid #e1e6ef;border-radius:12px;padding:14px;margin-top:10px}
+.payment-item strong{color:#123c69}
 footer{text-align:center;color:#657187;padding:20px;font-size:13px}
+.small-note{font-size:12px;color:#657187;line-height:1.5}
 </style>
 </head>
 <body>
@@ -35,9 +42,7 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 <section class="card">
 <h2>Mon résumé</h2>
 <label for="summaryEstablishment">Établissement à consulter</label>
-<select id="summaryEstablishment" onchange="render()">
-<option value="pierre">Pierre de Ronsard</option><option value="henri">Henri Asnath</option>
-</select>
+<select id="summaryEstablishment" onchange="render()"><option value="pierre">Pierre de Ronsard</option><option value="henri">Henri Asnath</option></select>
 <label for="monthFilter">Mois à consulter</label>
 <input type="month" id="monthFilter" onchange="render()">
 <div class="stats">
@@ -45,6 +50,24 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 <div class="stat">Salaire estimé<strong id="totalPay">0 FCFA</strong></div>
 </div>
 <p class="muted" id="rateSummary">Pierre de Ronsard — 1 300 FCFA par heure de cours réellement dispensée.</p>
+<div class="balance-box">
+<strong>Solde à percevoir</strong>
+<span class="balance-amount" id="outstandingBalance">0 FCFA</span>
+<p class="muted" style="margin:5px 0 0">Total des rémunérations gagnées et pas encore réglées, tous les mois confondus.</p>
+<div class="balance-meta"><span>Heures encore impayées : <strong id="unpaidHours">0 h</strong></span><span style="text-align:right">Déjà reçu : <strong id="totalReceived">0 FCFA</strong></span></div>
+</div>
+<button class="primary" type="button" onclick="togglePaymentForm()">＋ Enregistrer un paiement</button>
+<div id="paymentForm" class="payment-form" hidden>
+<h3 style="margin:0 0 8px">Enregistrer un paiement</h3>
+<p class="muted" id="paymentBalanceInfo"></p>
+<label for="paymentAmount">Montant reçu (FCFA)</label>
+<input type="number" id="paymentAmount" min="1" step="1" inputmode="numeric" placeholder="Ex. : 20000">
+<label for="paymentDate">Date du paiement</label><input type="date" id="paymentDate">
+<label for="paymentNotes">Observation (facultatif)</label><textarea id="paymentNotes" rows="2" placeholder="Ex. : Premier versement"></textarea>
+<button class="primary" type="button" onclick="savePayment()">Confirmer le paiement</button>
+<button class="secondary" type="button" onclick="togglePaymentForm(false)">Annuler</button>
+<p class="small-note">Le paiement sera affecté automatiquement aux séances impayées les plus anciennes de cet établissement. Un paiement partiel laissera le reste dû.</p>
+</div>
 </section>
 
 <section class="card">
@@ -53,9 +76,7 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 <label for="arrival">Heure d'arrivée à l'école</label><input type="time" id="arrival">
 <p class="muted">L'heure d'arrivée est enregistrée à titre de preuve. Elle n'est pas comptée dans les heures rémunérées.</p>
 <label for="establishment">Établissement</label>
-<select id="establishment" onchange="updateEstablishmentInfo()">
-<option value="pierre">Pierre de Ronsard</option><option value="henri">Henri Asnath</option>
-</select>
+<select id="establishment" onchange="updateEstablishmentInfo()"><option value="pierre">Pierre de Ronsard</option><option value="henri">Henri Asnath</option></select>
 <div class="rate-note" id="establishmentInfo">Matière : Mathématiques · Tarif : 1 300 FCFA / heure</div>
 <label for="className">Classe</label><input id="className" placeholder="Ex. : 6e, 4e, Terminale A">
 <label for="subject">Matière</label><input id="subject" value="Mathématiques" readonly>
@@ -67,141 +88,118 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 </section>
 
 <section class="card">
-<h2>Historique des séances</h2>
-<p class="muted" id="historyContext"></p>
+<h2>Historique des séances</h2><p class="muted" id="historyContext"></p>
 <div id="history"></div>
 <button class="secondary" onclick="exportCSV()">Exporter cet historique en CSV</button>
+</section>
+<section class="card">
+<h2>Historique des paiements</h2><p class="muted" id="paymentsContext"></p>
+<div id="paymentsHistory"></div>
 </section>
 </main>
 <footer>Mon Émargement — Suivi personnel des heures de cours</footer>
 
 <script>
 const STORAGE_KEY="mon_emargement_sessions";
-const ESTABLISHMENTS={
-  pierre:{name:"Pierre de Ronsard",subject:"Mathématiques",rate:1300},
-  henri:{name:"Henri Asnath",subject:"Anglais",rate:1200}
-};
-let sessions=[];
+const PAYMENTS_KEY="mon_emargement_payments";
+const MIGRATION_KEY="mon_emargement_migration_v2";
+const ESTABLISHMENTS={pierre:{name:"Pierre de Ronsard",subject:"Mathématiques",rate:1300},henri:{name:"Henri Asnath",subject:"Anglais",rate:1200}};
+let sessions=[],payments=[];
+function readArray(key,label){
+  const raw=localStorage.getItem(key);if(raw===null)return [];
+  const parsed=JSON.parse(raw);if(!Array.isArray(parsed))throw new Error("Le contenu de "+label+" n'est pas valide.");return parsed;
+}
+try{sessions=readArray(STORAGE_KEY,"l'historique des séances");payments=readArray(PAYMENTS_KEY,"l'historique des paiements");}
+catch(e){alert("Impossible de lire toutes les données : "+e.message+" Aucune donnée n'a été réinitialisée. Ne vide pas les données de Safari.");sessions=[];payments=[];}
+
+// Migration non destructive : les anciennes séances sans établissement sont attribuées à Pierre.
+// Toutes les séances préexistantes sont considérées impayées ; aucun paiement fictif n'est créé.
 try{
-  sessions=JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]");
-  if(!Array.isArray(sessions))sessions=[];
-}catch(e){
-  sessions=[];
-  alert("Les anciennes données n'ont pas pu être lues. Ne vide pas les données du navigateur.");
-}
+  let changed=false;
+  sessions=sessions.map(s=>{const key=ESTABLISHMENTS[s.establishment]?s.establishment:"pierre";const rate=Number(s.rate)||ESTABLISHMENTS[key].rate;if(s.establishment!==key||Number(s.rate)!==rate)changed=true;return {...s,establishment:key,rate};});
+  if(changed)localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));
+  if(!localStorage.getItem(PAYMENTS_KEY))localStorage.setItem(PAYMENTS_KEY,"[]");
+  if(!localStorage.getItem(MIGRATION_KEY))localStorage.setItem(MIGRATION_KEY,JSON.stringify({version:2,completedAt:new Date().toISOString(),legacySessionsCount:sessions.length,legacySessionsTreatedAs:"unpaid"}));
+}catch(e){alert("La préparation des données n'a pas pu être terminée. Les données d'origine sont conservées. Fais une sauvegarde avant toute nouvelle tentative.");}
 
-// Toutes les anciennes séances sont attribuées à Pierre de Ronsard,
-// conformément à la confirmation de l'utilisateur.
-let migrated=false;
-sessions=sessions.map(s=>{
-  if(!s.establishment){migrated=true;return {...s,establishment:"pierre",rate:1300};}
-  const key=ESTABLISHMENTS[s.establishment]?s.establishment:"pierre";
-  return {...s,establishment:key,rate:Number(s.rate)||ESTABLISHMENTS[key].rate};
-});
-if(migrated)localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));
-
-function localDate(){
-  const d=new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-document.getElementById("date").value=localDate();
-document.getElementById("monthFilter").value=localDate().slice(0,7);
-
-function getHours(start,end){
-  const [sh,sm]=start.split(":").map(Number),[eh,em]=end.split(":").map(Number);
-  const minutes=eh*60+em-(sh*60+sm);
-  if(minutes<=0)throw new Error("L'heure de fin doit être après le début.");
-  return minutes/60;
-}
-function updateEstablishmentInfo(){
-  const e=ESTABLISHMENTS[document.getElementById("establishment").value];
-  document.getElementById("subject").value=e.subject;
-  document.getElementById("establishmentInfo").textContent=`Matière : ${e.subject} · Tarif : ${e.rate.toLocaleString("fr-FR")} FCFA / heure`;
-}
+function localDate(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+document.getElementById("date").value=localDate();document.getElementById("monthFilter").value=localDate().slice(0,7);document.getElementById("paymentDate").value=localDate();
+function getHours(start,end){const [sh,sm]=start.split(":").map(Number),[eh,em]=end.split(":").map(Number);const minutes=eh*60+em-(sh*60+sm);if(minutes<=0)throw new Error("L'heure de fin doit être après le début.");return minutes/60;}
+function updateEstablishmentInfo(){const e=ESTABLISHMENTS[document.getElementById("establishment").value];document.getElementById("subject").value=e.subject;document.getElementById("establishmentInfo").textContent=`Matière : ${e.subject} · Tarif : ${e.rate.toLocaleString("fr-FR")} FCFA / heure`;}
 function saveSession(){
-  const date=document.getElementById("date").value;
-  const arrival=document.getElementById("arrival").value;
-  const establishmentKey=document.getElementById("establishment").value;
-  const e=ESTABLISHMENTS[establishmentKey];
-  const className=document.getElementById("className").value.trim();
-  const start=document.getElementById("start").value,end=document.getElementById("end").value;
-  const signed=document.getElementById("signed").checked,notes=document.getElementById("notes").value.trim();
-  if(!date||!className||!start||!end){alert("Remplis la date, la classe et les horaires du cours.");return;}
-  let hours;
-  try{hours=getHours(start,end);}catch(err){alert(err.message);return;}
-  sessions.push({id:Date.now(),date,arrival,establishment:establishmentKey,rate:e.rate,className,subject:e.subject,start,end,hours,signed,notes});
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));
-  ["className","arrival","start","end","notes"].forEach(id=>document.getElementById(id).value="");
-  document.getElementById("signed").checked=false;
-  document.getElementById("summaryEstablishment").value=establishmentKey;
-  render();alert("Séance enregistrée !");
+ const date=document.getElementById("date").value,arrival=document.getElementById("arrival").value,key=document.getElementById("establishment").value,e=ESTABLISHMENTS[key],className=document.getElementById("className").value.trim(),start=document.getElementById("start").value,end=document.getElementById("end").value,signed=document.getElementById("signed").checked,notes=document.getElementById("notes").value.trim();
+ if(!date||!className||!start||!end){alert("Remplis la date, la classe et les horaires du cours.");return;}
+ let hours;try{hours=getHours(start,end);}catch(err){alert(err.message);return;}
+ sessions.push({id:Date.now(),date,arrival,establishment:key,rate:e.rate,className,subject:e.subject,start,end,hours,signed,notes});
+ localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));["className","arrival","start","end","notes"].forEach(id=>document.getElementById(id).value="");document.getElementById("signed").checked=false;document.getElementById("summaryEstablishment").value=key;render();alert("Séance enregistrée !");
 }
 function escapeHTML(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function formatDate(s){
-  const [y,m,d]=s.split("-").map(Number);
-  return new Intl.DateTimeFormat("fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}).format(new Date(y,m-1,d));
-}
+function formatDate(s){const [y,m,d]=s.split("-").map(Number);return new Intl.DateTimeFormat("fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}).format(new Date(y,m-1,d));}
 function money(n){return Math.round(n).toLocaleString("fr-FR")+" FCFA";}
-function getVisibleSessions(){
-  const month=document.getElementById("monthFilter").value;
-  const key=document.getElementById("summaryEstablishment").value;
-  return sessions.filter(s=>s.establishment===key&&(!month||s.date.startsWith(month)));
+function establishmentKey(){return document.getElementById("summaryEstablishment").value;}
+function getVisibleSessions(){const month=document.getElementById("monthFilter").value,key=establishmentKey();return sessions.filter(s=>s.establishment===key&&(!month||s.date.startsWith(month)));}
+function sessionAmount(s){const rate=Number(s.rate)||ESTABLISHMENTS[s.establishment].rate;return Math.round(Number(s.hours||0)*rate);}
+function getPaidBySession(){const paid={};payments.forEach(p=>(p.allocations||[]).forEach(a=>{paid[a.sessionId]=(paid[a.sessionId]||0)+Number(a.amount||0);}));return paid;}
+function getFinancialSummary(key){
+ const paidBySession=getPaidBySession(),relevant=sessions.filter(s=>s.establishment===key);let earned=0,paid=0,remaining=0,unpaidHours=0;
+ relevant.forEach(s=>{const amount=sessionAmount(s),already=Math.min(amount,paidBySession[s.id]||0),left=Math.max(0,amount-already),rate=Number(s.rate)||ESTABLISHMENTS[key].rate;earned+=amount;paid+=already;remaining+=left;if(rate>0)unpaidHours+=left/rate;});
+ const received=payments.filter(p=>p.establishment===key).reduce((sum,p)=>sum+Number(p.amount||0),0);return {earned,paid,remaining,unpaidHours,received};
+}
+function togglePaymentForm(force){
+ const form=document.getElementById("paymentForm"),show=typeof force==="boolean"?force:form.hidden;form.hidden=!show;
+ if(show){const key=establishmentKey(),summary=getFinancialSummary(key);document.getElementById("paymentBalanceInfo").textContent=`${ESTABLISHMENTS[key].name} — solde actuel : ${money(summary.remaining)}.`;document.getElementById("paymentAmount").value="";document.getElementById("paymentNotes").value="";document.getElementById("paymentDate").value=localDate();}
+}
+function savePayment(){
+ const key=establishmentKey(),amount=Math.round(Number(document.getElementById("paymentAmount").value)),date=document.getElementById("paymentDate").value,notes=document.getElementById("paymentNotes").value.trim(),summary=getFinancialSummary(key);
+ if(!Number.isFinite(amount)||amount<=0){alert("Saisis un montant valide supérieur à zéro.");return;}if(!date){alert("Indique la date du paiement.");return;}if(amount>summary.remaining){alert(`Le montant dépasse le solde dû (${money(summary.remaining)}). Vérifie le montant saisi.`);return;}
+ let toAllocate=amount;const paidBySession=getPaidBySession(),oldest=sessions.filter(s=>s.establishment===key).slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.start||"").localeCompare(String(b.start||""))),allocations=[];
+ for(const s of oldest){if(toAllocate<=0)break;const left=Math.max(0,sessionAmount(s)-(paidBySession[s.id]||0));if(left<=0)continue;const allocated=Math.min(left,toAllocate);allocations.push({sessionId:s.id,amount:allocated});toAllocate-=allocated;}
+ if(toAllocate!==0){alert("Le paiement n'a pas pu être réparti entièrement. Aucune modification n'a été enregistrée.");return;}
+ const payment={id:`pay-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,establishment:key,amount,date,notes,allocations};
+ try{const next=[...payments,payment];localStorage.setItem(PAYMENTS_KEY,JSON.stringify(next));payments=next;togglePaymentForm(false);render();alert("Paiement enregistré. Le solde restant a été recalculé.");}
+ catch(e){alert("Le paiement n'a pas pu être enregistré. Vérifie l'espace disponible dans Safari. Aucune séance n'a été supprimée.");}
+}
+function renderPayments(key){
+ const container=document.getElementById("paymentsHistory"),list=payments.filter(p=>p.establishment===key).slice().sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id)));
+ document.getElementById("paymentsContext").textContent=ESTABLISHMENTS[key].name+" · Tous les paiements enregistrés";
+ if(!list.length){container.innerHTML='<p class="muted">Aucun paiement enregistré pour cet établissement.</p>';return;}
+ container.innerHTML=list.map(p=>`<div class="payment-item"><strong>${money(p.amount)}</strong><p class="muted" style="margin:6px 0">${escapeHTML(formatDate(p.date))}</p>${p.notes?`<p>${escapeHTML(p.notes)}</p>`:""}<p class="small-note">Paiement enregistré · ${(p.allocations||[]).length} affectation(s) aux séances</p></div>`).join("");
 }
 function render(){
-  const key=document.getElementById("summaryEstablishment").value,e=ESTABLISHMENTS[key];
-  const month=document.getElementById("monthFilter").value,filtered=getVisibleSessions();
-  const hours=filtered.reduce((a,s)=>a+Number(s.hours||0),0);
-  const pay=filtered.reduce((a,s)=>a+Number(s.hours||0)*(Number(s.rate)||e.rate),0);
-  document.getElementById("totalHours").textContent=hours.toFixed(2)+" h";
-  document.getElementById("totalPay").textContent=money(pay);
-  document.getElementById("rateSummary").textContent=`${e.name} — ${e.rate.toLocaleString("fr-FR")} FCFA par heure de cours réellement dispensée.`;
-  document.getElementById("historyContext").textContent=e.name+(month?" · "+month:"");
-  const history=document.getElementById("history");
-  if(!filtered.length){history.innerHTML='<p class="muted">Aucune séance enregistrée pour cet établissement et ce mois.</p>';return;}
-  const groups={};
-  filtered.forEach(s=>(groups[s.date]??=[]).push(s));
-  history.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>{
-    const day=groups[date].sort((a,b)=>b.start.localeCompare(a.start));
-    return `<h3 class="day-heading">${escapeHTML(formatDate(date))}</h3>`+day.map(s=>{
-      const rate=Number(s.rate)||ESTABLISHMENTS[s.establishment].rate;
-      return `<div class="session">
-        <h3>${escapeHTML(s.className)} — ${escapeHTML(s.subject)}</h3>
-        <p class="muted">${escapeHTML(ESTABLISHMENTS[s.establishment].name)}</p>
-        <p>${escapeHTML(s.start)} – ${escapeHTML(s.end)} (${Number(s.hours).toFixed(2)} h)</p>
-        <p>Arrivée : ${escapeHTML(s.arrival||"Non renseignée")}</p>
-        <p>${s.signed?'<span class="signed">✓ Signée</span>':'<span class="unsigned">⚠ Non signée</span>'}</p>
-        <p class="muted">Tarif : ${rate.toLocaleString("fr-FR")} FCFA / heure</p>
-        <p><strong>${money(Number(s.hours)*rate)}</strong></p>
-        ${s.notes?`<p>${escapeHTML(s.notes)}</p>`:""}
-        <button class="secondary" onclick="deleteSession(${Number(s.id)})">Supprimer cette séance</button>
-      </div>`;
-    }).join("");
-  }).join("");
+ const key=establishmentKey(),e=ESTABLISHMENTS[key],month=document.getElementById("monthFilter").value,filtered=getVisibleSessions(),hours=filtered.reduce((a,s)=>a+Number(s.hours||0),0),pay=filtered.reduce((a,s)=>a+sessionAmount(s),0),financial=getFinancialSummary(key);
+ document.getElementById("totalHours").textContent=hours.toFixed(2)+" h";document.getElementById("totalPay").textContent=money(pay);document.getElementById("rateSummary").textContent=`${e.name} — ${e.rate.toLocaleString("fr-FR")} FCFA par heure de cours réellement dispensée.`;
+ document.getElementById("outstandingBalance").textContent=money(financial.remaining);document.getElementById("unpaidHours").textContent=financial.unpaidHours.toFixed(2)+" h";document.getElementById("totalReceived").textContent=money(financial.received);document.getElementById("historyContext").textContent=e.name+(month?" · "+month:"");
+ const history=document.getElementById("history");
+ if(!filtered.length)history.innerHTML='<p class="muted">Aucune séance enregistrée pour cet établissement et ce mois.</p>';
+ else{
+  const groups={};filtered.forEach(s=>(groups[s.date]??=[]).push(s));
+  history.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>{const day=groups[date].sort((a,b)=>b.start.localeCompare(a.start));return `<h3 class="day-heading">${escapeHTML(formatDate(date))}</h3>`+day.map(s=>{const rate=Number(s.rate)||ESTABLISHMENTS[s.establishment].rate;return `<div class="session">
+<h3>${escapeHTML(s.className)} — ${escapeHTML(s.subject)}</h3>
+<p class="muted">${escapeHTML(ESTABLISHMENTS[s.establishment].name)}</p>
+<p>${escapeHTML(s.start)} – ${escapeHTML(s.end)} (${Number(s.hours).toFixed(2)} h)</p>
+<p>Arrivée : ${escapeHTML(s.arrival||"Non renseignée")}</p>
+<p>${s.signed?'<span class="signed">✓ Signée</span>':'<span class="unsigned">⚠ Non signée</span>'}</p>
+<p class="muted">Tarif : ${rate.toLocaleString("fr-FR")} FCFA / heure</p>
+<p><strong>${money(sessionAmount(s))}</strong></p>
+${s.notes?`<p>${escapeHTML(s.notes)}</p>`:""}
+<button class="secondary" onclick="deleteSession(${Number(s.id)})">Supprimer cette séance</button>
+</div>`;}).join("");}).join("");
+ }
+ renderPayments(key);
 }
 function deleteSession(id){
-  if(!confirm("Supprimer cette séance ?"))return;
-  sessions=sessions.filter(s=>Number(s.id)!==Number(id));
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));render();
+ const hasPayment=payments.some(p=>(p.allocations||[]).some(a=>Number(a.sessionId)===Number(id)));
+ if(hasPayment){alert("Cette séance a déjà reçu tout ou partie d'un paiement. Pour préserver l'historique comptable, elle ne peut pas être supprimée directement. Il faut d'abord corriger le paiement correspondant.");return;}
+ if(!confirm("Supprimer cette séance ?"))return;sessions=sessions.filter(s=>Number(s.id)!==Number(id));localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));render();
 }
 function exportCSV(){
-  const key=document.getElementById("summaryEstablishment").value,e=ESTABLISHMENTS[key];
-  const month=document.getElementById("monthFilter").value;
-  const selected=getVisibleSessions().slice().sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start));
-  if(!selected.length){alert("Aucune séance à exporter pour cet établissement et ce mois.");return;}
-  const rows=[
-    ["Date","Jour","Établissement","Arrivée","Classe","Matière","Début","Fin","Heures","Tarif horaire FCFA","Montant FCFA","Signée","Observations"],
-    ...selected.map(s=>[s.date,formatDate(s.date),ESTABLISHMENTS[s.establishment].name,s.arrival||"",s.className,s.subject,s.start,s.end,Number(s.hours).toFixed(2),Number(s.rate)||ESTABLISHMENTS[s.establishment].rate,Math.round(Number(s.hours)*(Number(s.rate)||ESTABLISHMENTS[s.establishment].rate)),s.signed?"Oui":"Non",s.notes||""])
-  ];
-  const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r\n");
-  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob),link=document.createElement("a");
-  link.href=url;
-  link.download=`emargement-${e.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${month||"toutes-les-dates"}.csv`;
-  document.body.appendChild(link);link.click();link.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const key=establishmentKey(),e=ESTABLISHMENTS[key],month=document.getElementById("monthFilter").value,selected=getVisibleSessions().slice().sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start));
+ if(!selected.length){alert("Aucune séance à exporter pour cet établissement et ce mois.");return;}
+ const rows=[["Date","Jour","Établissement","Arrivée","Classe","Matière","Début","Fin","Heures","Tarif horaire FCFA","Montant FCFA","Signée","Observations"],...selected.map(s=>[s.date,formatDate(s.date),ESTABLISHMENTS[s.establishment].name,s.arrival||"",s.className,s.subject,s.start,s.end,Number(s.hours).toFixed(2),Number(s.rate)||ESTABLISHMENTS[s.establishment].rate,sessionAmount(s),s.signed?"Oui":"Non",s.notes||""])];
+ const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r\n"),blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download=`emargement-${e.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${month||"toutes-les-dates"}.csv`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-updateEstablishmentInfo();
-render();
+updateEstablishmentInfo();render();
 </script>
 </body>
 </html>
