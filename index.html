@@ -30,8 +30,10 @@ button{width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-wei
 .balance-amount{display:block;color:#123c69;font-size:28px;font-weight:800;margin-top:5px}
 .balance-meta{display:flex;justify-content:space-between;gap:12px;margin-top:12px;font-size:14px;color:#657187}
 .payment-form{border:1px solid #e1e6ef;border-radius:12px;padding:14px;margin-top:12px}
-.payment-item{border:1px solid #e1e6ef;border-radius:12px;padding:14px;margin-top:10px}
-.payment-item strong{color:#123c69}
+.payment-item{border:1px solid #e1e6ef;border-radius:12px;padding:16px;margin-top:12px;background:#fff}
+.payment-amount{display:block;color:#123c69;font-size:25px;font-weight:800;margin-bottom:5px}
+.payment-detail{margin:7px 0;font-size:14px;color:#39465b}
+.payment-meta{margin-top:10px;padding-top:10px;border-top:1px solid #edf1f7;color:#657187;font-size:13px;line-height:1.6}
 footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 .small-note{font-size:12px;color:#657187;line-height:1.5}
 </style>
@@ -63,10 +65,12 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 <label for="paymentAmount">Montant reçu (FCFA)</label>
 <input type="number" id="paymentAmount" min="1" step="1" inputmode="numeric" placeholder="Ex. : 20000">
 <label for="paymentDate">Date du paiement</label><input type="date" id="paymentDate">
+<label for="paymentPayer">Nom du payeur (facultatif)</label>
+<input type="text" id="paymentPayer" maxlength="100" placeholder="Ex. : Directeur, secrétaire...">
 <label for="paymentNotes">Observation (facultatif)</label><textarea id="paymentNotes" rows="2" placeholder="Ex. : Premier versement"></textarea>
 <button class="primary" type="button" onclick="savePayment()">Confirmer le paiement</button>
 <button class="secondary" type="button" onclick="togglePaymentForm(false)">Annuler</button>
-<p class="small-note">Le paiement sera affecté automatiquement aux séances impayées les plus anciennes de cet établissement. Un paiement partiel laissera le reste dû.</p>
+<p class="small-note">Le paiement sera affecté automatiquement aux séances impayées les plus anciennes de cet établissement. Un paiement partiel laissera le reste dû. L'heure d'enregistrement sera capturée automatiquement.</p>
 </div>
 </section>
 
@@ -136,6 +140,22 @@ function saveSession(){
 function escapeHTML(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function formatDate(s){const [y,m,d]=s.split("-").map(Number);return new Intl.DateTimeFormat("fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}).format(new Date(y,m-1,d));}
 function money(n){return Math.round(n).toLocaleString("fr-FR")+" FCFA";}
+function formatRecordedTime(iso){
+ if(!iso)return "Heure non enregistrée";
+ const d=new Date(iso);if(Number.isNaN(d.getTime()))return "Heure non enregistrée";
+ return new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit"}).format(d);
+}
+function paymentPeriod(payment){
+ const ids=new Set((payment.allocations||[]).map(a=>String(a.sessionId)));
+ const paidSessions=sessions.filter(s=>ids.has(String(s.id)));
+ if(!paidSessions.length)return "Période non disponible";
+ const months=[...new Set(paidSessions.map(s=>s.date.slice(0,7)))].sort();
+ const labels=months.map(value=>{
+  const [year,month]=value.split("-").map(Number);
+  return new Intl.DateTimeFormat("fr-FR",{month:"long",year:"numeric"}).format(new Date(year,month-1,1));
+ });
+ return labels.length===1?labels[0]:labels[0]+" – "+labels[labels.length-1];
+}
 function establishmentKey(){return document.getElementById("summaryEstablishment").value;}
 function getVisibleSessions(){const month=document.getElementById("monthFilter").value,key=establishmentKey();return sessions.filter(s=>s.establishment===key&&(!month||s.date.startsWith(month)));}
 function sessionAmount(s){const rate=Number(s.rate)||ESTABLISHMENTS[s.establishment].rate;return Math.round(Number(s.hours||0)*rate);}
@@ -147,15 +167,15 @@ function getFinancialSummary(key){
 }
 function togglePaymentForm(force){
  const form=document.getElementById("paymentForm"),show=typeof force==="boolean"?force:form.hidden;form.hidden=!show;
- if(show){const key=establishmentKey(),summary=getFinancialSummary(key);document.getElementById("paymentBalanceInfo").textContent=`${ESTABLISHMENTS[key].name} — solde actuel : ${money(summary.remaining)}.`;document.getElementById("paymentAmount").value="";document.getElementById("paymentNotes").value="";document.getElementById("paymentDate").value=localDate();}
+ if(show){const key=establishmentKey(),summary=getFinancialSummary(key);document.getElementById("paymentBalanceInfo").textContent=`${ESTABLISHMENTS[key].name} — solde actuel : ${money(summary.remaining)}.`;document.getElementById("paymentAmount").value="";document.getElementById("paymentPayer").value="";document.getElementById("paymentNotes").value="";document.getElementById("paymentDate").value=localDate();}
 }
 function savePayment(){
- const key=establishmentKey(),amount=Math.round(Number(document.getElementById("paymentAmount").value)),date=document.getElementById("paymentDate").value,notes=document.getElementById("paymentNotes").value.trim(),summary=getFinancialSummary(key);
+ const key=establishmentKey(),amount=Math.round(Number(document.getElementById("paymentAmount").value)),date=document.getElementById("paymentDate").value,payer=document.getElementById("paymentPayer").value.trim(),notes=document.getElementById("paymentNotes").value.trim(),summary=getFinancialSummary(key);
  if(!Number.isFinite(amount)||amount<=0){alert("Saisis un montant valide supérieur à zéro.");return;}if(!date){alert("Indique la date du paiement.");return;}if(amount>summary.remaining){alert(`Le montant dépasse le solde dû (${money(summary.remaining)}). Vérifie le montant saisi.`);return;}
  let toAllocate=amount;const paidBySession=getPaidBySession(),oldest=sessions.filter(s=>s.establishment===key).slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.start||"").localeCompare(String(b.start||""))),allocations=[];
  for(const s of oldest){if(toAllocate<=0)break;const left=Math.max(0,sessionAmount(s)-(paidBySession[s.id]||0));if(left<=0)continue;const allocated=Math.min(left,toAllocate);allocations.push({sessionId:s.id,amount:allocated});toAllocate-=allocated;}
  if(toAllocate!==0){alert("Le paiement n'a pas pu être réparti entièrement. Aucune modification n'a été enregistrée.");return;}
- const payment={id:`pay-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,establishment:key,amount,date,notes,allocations};
+ const payment={id:`pay-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,establishment:key,amount,date,payer,notes,recordedAt:new Date().toISOString(),allocations};
  try{const next=[...payments,payment];localStorage.setItem(PAYMENTS_KEY,JSON.stringify(next));payments=next;togglePaymentForm(false);render();alert("Paiement enregistré. Le solde restant a été recalculé.");}
  catch(e){alert("Le paiement n'a pas pu être enregistré. Vérifie l'espace disponible dans Safari. Aucune séance n'a été supprimée.");}
 }
@@ -163,7 +183,16 @@ function renderPayments(key){
  const container=document.getElementById("paymentsHistory"),list=payments.filter(p=>p.establishment===key).slice().sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id)));
  document.getElementById("paymentsContext").textContent=ESTABLISHMENTS[key].name+" · Tous les paiements enregistrés";
  if(!list.length){container.innerHTML='<p class="muted">Aucun paiement enregistré pour cet établissement.</p>';return;}
- container.innerHTML=list.map(p=>`<div class="payment-item"><strong>${money(p.amount)}</strong><p class="muted" style="margin:6px 0">${escapeHTML(formatDate(p.date))}</p>${p.notes?`<p>${escapeHTML(p.notes)}</p>`:""}<p class="small-note">Paiement enregistré · ${(p.allocations||[]).length} affectation(s) aux séances</p></div>`).join("");
+ container.innerHTML=list.map(p=>`<div class="payment-item">
+ <strong class="payment-amount">${money(p.amount)}</strong>
+ <p class="payment-detail"><strong>Date du paiement :</strong> ${escapeHTML(formatDate(p.date))}</p>
+ <p class="payment-detail"><strong>Heure d'enregistrement :</strong> ${escapeHTML(formatRecordedTime(p.recordedAt))}</p>
+ ${p.payer?`<p class="payment-detail"><strong>Remis par :</strong> ${escapeHTML(p.payer)}</p>`:""}
+ <p class="payment-detail"><strong>Période concernée :</strong> ${escapeHTML(paymentPeriod(p))}</p>
+ <p class="payment-detail"><strong>Séances concernées :</strong> ${(p.allocations||[]).length}</p>
+ ${p.notes?`<p class="payment-detail"><strong>Observation :</strong> ${escapeHTML(p.notes)}</p>`:""}
+ <div class="payment-meta">Paiement enregistré pour ${escapeHTML(ESTABLISHMENTS[p.establishment]?.name||p.establishment||"Établissement non précisé")}</div>
+ </div>`).join("");
 }
 function render(){
  const key=establishmentKey(),e=ESTABLISHMENTS[key],month=document.getElementById("monthFilter").value,filtered=getVisibleSessions(),hours=filtered.reduce((a,s)=>a+Number(s.hours||0),0),pay=filtered.reduce((a,s)=>a+sessionAmount(s),0),financial=getFinancialSummary(key);
