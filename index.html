@@ -199,7 +199,7 @@ function renderPayments(key){
  container.innerHTML=list.map(p=>`<div class="payment-item">
  <div class="payment-card-head"><h3 class="payment-card-title">Paiement reçu</h3><span class="payment-status">Enregistré</span></div>
  <strong class="payment-amount">${money(p.amount)}</strong>
- <div class="payment-date-row"><span class="payment-icon">▢</span><span>${escapeHTML(formatDate(p.date))}</span></div>
+ <div class="payment-date-row"><span class="payment-icon"></span><span>${escapeHTML(formatDate(p.date))}</span></div>
  <div class="payment-date-row"><span class="payment-icon">◷</span><span>${escapeHTML(formatRecordedTime(p.recordedAt))}</span></div>
  <hr class="payment-divider">
  ${p.payer?`<p class="payment-detail"><strong>Payeur :</strong> ${escapeHTML(p.payer)}${p.payerSelfEntered?' <span class="muted">(nom écrit par le payeur)</span>':''}</p>`:""}
