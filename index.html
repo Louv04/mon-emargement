@@ -47,11 +47,72 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 .small-note{font-size:12px;color:#657187;line-height:1.5}
 .checkbox-line{display:flex;align-items:center;gap:9px;font-weight:500;margin:10px 0 4px}
 .checkbox-line input{width:auto;margin:0}
-@media(max-width:420px){.payment-item{padding:19px 17px;border-radius:24px}.payment-amount{font-size:31px}.payment-date-row{font-size:16px}.payment-detail{font-size:16px}}
+
+/* Profil local : mêmes couleurs et arrondis que l'application */
+.profile-bar{display:flex;align-items:center;gap:12px;margin-top:17px}
+.profile-avatar{width:48px;height:48px;border-radius:50%;background:#ffffff24;border:2px solid #ffffff70;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none;font-size:23px}
+.profile-avatar img{width:100%;height:100%;object-fit:cover}
+.profile-identity{min-width:0;flex:1}
+.profile-identity strong{display:block;font-size:16px;overflow-wrap:anywhere}
+.profile-identity span{display:block;font-size:13px;opacity:.82;margin-top:3px}
+.profile-edit{width:auto;margin:0;padding:9px 12px;background:#ffffff20;color:white;border:1px solid #ffffff55;font-size:13px}
+.profile-gate{max-width:650px;margin:18px auto;padding:18px}
+.profile-card{background:white;padding:22px;border-radius:18px;box-shadow:0 4px 16px #00000008}
+.profile-card h2{margin-top:0}
+.profile-photo-wrap{display:flex;align-items:center;gap:14px;margin:16px 0}
+.profile-photo-preview{width:76px;height:76px;border-radius:50%;background:#edf4ff;color:#123c69;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:30px;flex:none}
+.profile-photo-preview img{width:100%;height:100%;object-fit:cover}
+.profile-photo-actions{flex:1;min-width:0}
+.profile-photo-actions input{padding:9px;font-size:13px}
+.profile-checks{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.profile-check{display:flex;align-items:center;gap:8px;border:1px solid #d8deea;border-radius:10px;padding:12px;font-weight:500;margin:0}
+.profile-check input{width:auto;margin:0}
+.profile-help{font-size:12px;color:#657187;line-height:1.5}
+@media(max-width:420px){.payment-item{padding:19px 17px;border-radius:24px}.payment-amount{font-size:31px}.payment-date-row{font-size:16px}.payment-detail{font-size:16px}.profile-edit{padding:8px 10px}}
 </style>
 </head>
 <body>
-<header><h1>📘 Mon Émargement</h1><p>Suivi personnel de mes heures de cours</p></header>
+<header>
+  <h1>📘 Mon Émargement</h1>
+  <p>Suivi personnel de mes heures de cours</p>
+  <div class="profile-bar" id="profileBar" hidden>
+    <div class="profile-avatar" id="headerAvatar">👤</div>
+    <div class="profile-identity"><strong id="headerName"></strong><span id="headerRole"></span></div>
+    <button class="profile-edit" type="button" onclick="editProfile()">Mon profil</button>
+  </div>
+</header>
+
+<section class="profile-gate" id="profileGate" hidden>
+  <div class="profile-card">
+    <h2 id="profileFormTitle">Bienvenue sur Mon Émargement 👋</h2>
+    <p class="muted" id="profileIntro">Pour commencer, crée ton profil personnel sur cet appareil.</p>
+    <form id="profileForm" onsubmit="saveProfile(event)">
+      <label for="profileName">Nom et prénom</label>
+      <input id="profileName" maxlength="100" autocomplete="name" required placeholder="Ex. : Jean Dupont">
+      <label for="profileRole">Fonction</label>
+      <input id="profileRole" maxlength="80" placeholder="Ex. : Enseignant de mathématiques" required>
+      <label>Photo de profil (facultative)</label>
+      <div class="profile-photo-wrap">
+        <div class="profile-photo-preview" id="profilePhotoPreview">👤</div>
+        <div class="profile-photo-actions">
+          <input id="profilePhoto" type="file" accept="image/*" onchange="previewProfilePhoto(event)">
+          <p class="profile-help">La photo sera réduite avant son enregistrement pour limiter l'espace utilisé.</p>
+          <button class="secondary" type="button" id="removePhotoButton" onclick="removeProfilePhoto()" hidden>Retirer la photo</button>
+        </div>
+      </div>
+      <label>Établissement(s)</label>
+      <div class="profile-checks">
+        <label class="profile-check"><input type="checkbox" id="profilePierre" value="pierre"> Pierre de Ronsard</label>
+        <label class="profile-check"><input type="checkbox" id="profileHenri" value="henri"> Henri Asnath</label>
+      </div>
+      <p class="profile-help">Tu peux sélectionner un ou plusieurs établissements. Ce choix décrit ton profil et ne modifie pas les historiques existants.</p>
+      <button class="primary" type="submit">Enregistrer mon profil</button>
+      <button class="secondary" type="button" id="cancelProfileButton" onclick="cancelProfileEdit()" hidden>Annuler</button>
+    </form>
+  </div>
+</section>
+
+<div id="appContent" hidden>
 <main>
 <section class="card">
 <h2>Mon résumé</h2>
@@ -115,13 +176,15 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 </section>
 </main>
 <footer>Mon Émargement — Suivi personnel des heures de cours</footer>
+</div>
 
 <script>
 const STORAGE_KEY="mon_emargement_sessions";
 const PAYMENTS_KEY="mon_emargement_payments";
 const MIGRATION_KEY="mon_emargement_migration_v2";
+const PROFILE_KEY="mon_emargement_profile_v1";
 const ESTABLISHMENTS={pierre:{name:"Pierre de Ronsard",subject:"Mathématiques",rate:1300},henri:{name:"Henri Asnath",subject:"Anglais",rate:1200}};
-let sessions=[],payments=[];
+let sessions=[],payments=[],profile=null,pendingPhoto=null;
 function readArray(key,label){
   const raw=localStorage.getItem(key);if(raw===null)return [];
   const parsed=JSON.parse(raw);if(!Array.isArray(parsed))throw new Error("Le contenu de "+label+" n'est pas valide.");return parsed;
@@ -138,6 +201,83 @@ try{
   if(!localStorage.getItem(PAYMENTS_KEY))localStorage.setItem(PAYMENTS_KEY,"[]");
   if(!localStorage.getItem(MIGRATION_KEY))localStorage.setItem(MIGRATION_KEY,JSON.stringify({version:2,completedAt:new Date().toISOString(),legacySessionsCount:sessions.length,legacySessionsTreatedAs:"unpaid"}));
 }catch(e){alert("La préparation des données n'a pas pu être terminée. Les données d'origine sont conservées. Fais une sauvegarde avant toute nouvelle tentative.");}
+
+function showProfileGate(){
+  document.getElementById("profileGate").hidden=false;
+  document.getElementById("appContent").hidden=true;
+  document.getElementById("profileBar").hidden=true;
+}
+function loadProfile(){
+  try{const raw=localStorage.getItem(PROFILE_KEY);profile=raw?JSON.parse(raw):null;}
+  catch(e){alert("Le profil enregistré ne peut pas être lu. Tes séances et paiements restent intacts.");profile=null;}
+  if(!profile||!profile.name||!Array.isArray(profile.schools)||!profile.schools.length){showProfileGate();return;}
+  displayProfile();
+}
+function displayProfile(){
+  document.getElementById("profileGate").hidden=true;
+  document.getElementById("appContent").hidden=false;
+  document.getElementById("profileBar").hidden=false;
+  document.getElementById("headerName").textContent=profile.name;
+  document.getElementById("headerRole").textContent=profile.role||"Mon profil";
+  const avatar=document.getElementById("headerAvatar");
+  avatar.innerHTML=profile.photo?`<img src="${profile.photo}" alt="Photo de profil">`:"👤";
+}
+function editProfile(){
+  document.getElementById("profileFormTitle").textContent="Modifier mon profil";
+  document.getElementById("profileIntro").textContent="Mets à jour tes informations personnelles.";
+  document.getElementById("profileName").value=profile?.name||"";
+  document.getElementById("profileRole").value=profile?.role||"";
+  document.getElementById("profilePierre").checked=!!profile?.schools?.includes("pierre");
+  document.getElementById("profileHenri").checked=!!profile?.schools?.includes("henri");
+  pendingPhoto=profile?.photo||null;
+  updatePhotoPreview();
+  document.getElementById("profilePhoto").value="";
+  document.getElementById("removePhotoButton").hidden=!pendingPhoto;
+  document.getElementById("cancelProfileButton").hidden=false;
+  document.getElementById("profileGate").hidden=false;
+  document.getElementById("appContent").hidden=true;
+  window.scrollTo(0,0);
+}
+function cancelProfileEdit(){
+  if(profile){displayProfile();return;}
+  showProfileGate();
+}
+function previewProfilePhoto(event){
+  const file=event.target.files&&event.target.files[0];if(!file)return;
+  if(!file.type.startsWith("image/")){alert("Choisis un fichier image.");event.target.value="";return;}
+  if(file.size>12*1024*1024){alert("Cette image est trop volumineuse. Choisis une photo de moins de 12 Mo.");event.target.value="";return;}
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const max=320,scale=Math.min(1,max/Math.max(img.width,img.height));
+      const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));
+      const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      pendingPhoto=canvas.toDataURL("image/jpeg",0.76);updatePhotoPreview();document.getElementById("removePhotoButton").hidden=false;
+    };
+    img.onerror=()=>alert("Impossible de lire cette image. Essaie une autre photo.");
+    img.src=reader.result;
+  };
+  reader.onerror=()=>alert("La photo n'a pas pu être chargée.");
+  reader.readAsDataURL(file);
+}
+function updatePhotoPreview(){
+  const box=document.getElementById("profilePhotoPreview");
+  box.innerHTML=pendingPhoto?`<img src="${pendingPhoto}" alt="Aperçu de la photo">`:"👤";
+  document.getElementById("removePhotoButton").hidden=!pendingPhoto;
+}
+function removeProfilePhoto(){pendingPhoto=null;document.getElementById("profilePhoto").value="";updatePhotoPreview();}
+function saveProfile(event){
+  event.preventDefault();
+  const name=document.getElementById("profileName").value.trim(),role=document.getElementById("profileRole").value.trim(),schools=[];
+  if(document.getElementById("profilePierre").checked)schools.push("pierre");
+  if(document.getElementById("profileHenri").checked)schools.push("henri");
+  if(!name||!role){alert("Renseigne ton nom et ta fonction.");return;}
+  if(!schools.length){alert("Sélectionne au moins un établissement.");return;}
+  const next={name,role,schools,photo:pendingPhoto||null,updatedAt:new Date().toISOString()};
+  try{localStorage.setItem(PROFILE_KEY,JSON.stringify(next));profile=next;displayProfile();window.scrollTo(0,0);}
+  catch(e){alert("Le profil n'a pas pu être enregistré. Essaie une photo plus légère ou retire-la. Tes séances et paiements n'ont pas été modifiés.");}
+}
 
 function localDate(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
 document.getElementById("date").value=localDate();document.getElementById("monthFilter").value=localDate().slice(0,7);document.getElementById("paymentDate").value=localDate();
@@ -185,6 +325,7 @@ function togglePaymentForm(force){
 function savePayment(){
  const key=establishmentKey(),amount=Math.round(Number(document.getElementById("paymentAmount").value)),date=document.getElementById("paymentDate").value,payer=document.getElementById("paymentPayer").value.trim(),payerSelfEntered=document.getElementById("payerSelfEntered").checked,notes=document.getElementById("paymentNotes").value.trim(),summary=getFinancialSummary(key);
  if(!Number.isFinite(amount)||amount<=0){alert("Saisis un montant valide supérieur à zéro.");return;}if(!date){alert("Indique la date du paiement.");return;}if(amount>summary.remaining){alert(`Le montant dépasse le solde dû (${money(summary.remaining)}). Vérifie le montant saisi.`);return;}
+ if(payerSelfEntered&&!payer){alert("Saisis le nom du payeur avant de cocher cette case.");return;}
  let toAllocate=amount;const paidBySession=getPaidBySession(),oldest=sessions.filter(s=>s.establishment===key).slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.start||"").localeCompare(String(b.start||""))),allocations=[];
  for(const s of oldest){if(toAllocate<=0)break;const left=Math.max(0,sessionAmount(s)-(paidBySession[s.id]||0));if(left<=0)continue;const allocated=Math.min(left,toAllocate);allocations.push({sessionId:s.id,amount:allocated});toAllocate-=allocated;}
  if(toAllocate!==0){alert("Le paiement n'a pas pu être réparti entièrement. Aucune modification n'a été enregistrée.");return;}
@@ -244,7 +385,9 @@ function exportCSV(){
  const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r\n"),blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob),link=document.createElement("a");
  link.href=url;link.download=`emargement-${e.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${month||"toutes-les-dates"}.csv`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-updateEstablishmentInfo();render();
+updateEstablishmentInfo();
+loadProfile();
+if(profile)render();
 </script>
 </body>
 </html>
