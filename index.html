@@ -19,7 +19,7 @@ main{max-width:650px;margin:auto;padding:18px}
 label{display:block;font-weight:600;margin:14px 0 6px}
 input,select,textarea{width:100%;padding:12px;border:1px solid #d8deea;border-radius:10px;font:inherit;background:white}
 button{width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-weight:700;margin-top:12px;cursor:pointer}
-.primary{background:#123c69;color:white}.secondary{background:#e8eef6;color:#123c69}
+.primary{background:#123c69;color:white}.secondary{background:#e8eef6;color:#123c69}.danger{background:#c62828;color:white}
 .session{border:1px solid #e1e6ef;border-radius:12px;padding:14px;margin-top:12px}
 .session h3{margin:0 0 8px}
 .day-heading{margin:22px 0 4px;padding-bottom:8px;border-bottom:2px solid #edf1f7;color:#6b4bb8;font-size:15px;text-transform:uppercase;letter-spacing:.3px}
@@ -144,6 +144,7 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
   <div class="profile-card">
     <h2 id="profileFormTitle">Bienvenue sur Mon Émargement 👋</h2>
     <p class="muted" id="profileIntro">Pour commencer, crée ton profil personnel sur cet appareil.</p>
+    <button class="secondary" type="button" id="profileBackButton" onclick="cancelProfileEdit()" hidden>← Retour à l’accueil</button>
     <form id="profileForm" onsubmit="saveProfile(event)">
       <label for="profileName">Nom et prénom</label>
       <input id="profileName" maxlength="100" autocomplete="name" required placeholder="Ex. : Jean Dupont">
@@ -162,7 +163,6 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
       <div class="profile-checks" id="profileSchools"></div>
       <p class="profile-help">Tu peux sélectionner un ou plusieurs établissements. Ce choix décrit ton profil et ne modifie pas les historiques existants.</p>
       <button class="primary" type="submit">Enregistrer mon profil</button>
-      <button class="secondary" type="button" id="cancelProfileButton" onclick="cancelProfileEdit()" hidden>Annuler</button>
     </form>
   </div>
   <section class="card profile-management-card">
@@ -348,7 +348,7 @@ function renderEstablishments(){
   const subjects=e.subjects.length?e.subjects.map(subject=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><p style="margin:8px 0">${escapeHTML(subject.name)} — <strong>${money(subject.rate)}/h</strong></p>${!archived?`<button class="secondary" style="width:auto;margin:4px 0;padding:8px 10px;font-size:13px" type="button" onclick="changeSubjectRate('${escapeHTML(key)}','${escapeHTML(subject.id)}')">Modifier le tarif</button>`:''}</div>`).join(""):'<p class="muted">Aucune matière configurée.</p>';
   const action=archived
    ?`<button class="secondary" style="width:auto;margin:8px 6px 0 0" type="button" onclick="reactivateEstablishment('${escapeHTML(key)}')">Réactiver</button>`
-   :`<button class="secondary" style="width:auto;margin:8px 6px 0 0" type="button" onclick="deleteEstablishment('${escapeHTML(key)}')">Supprimer</button>`;
+   :`<button class="danger" style="width:auto;margin:8px 6px 0 0" type="button" onclick="deleteEstablishment('${escapeHTML(key)}')">Supprimer</button>`;
   const note=archived?'<p class="profile-help">Cet établissement est archivé. Ses anciennes séances, paiements et soldes restent consultables dans le résumé.</p>':(hasHistory?'<p class="profile-help">Des données existent : la suppression l’archivera sans effacer les historiques.</p>':'');
   return `<div class="session"><h3>${escapeHTML(e.name)}${status}</h3>${subjects}${note}${action}</div>`;
  }).join("")||'<p class="muted">Aucun établissement enregistré pour le moment.</p>';
@@ -439,6 +439,7 @@ function loadProfile(){
   displayProfile();
 }
 function displayProfile(){
+  document.getElementById("profileBackButton").hidden=true;
   document.getElementById("profileGate").hidden=true;
   document.getElementById("appContent").hidden=false;
   document.getElementById("profileBar").hidden=false;
@@ -457,7 +458,7 @@ function editProfile(){
   updatePhotoPreview();
   document.getElementById("profilePhoto").value="";
   document.getElementById("removePhotoButton").hidden=!pendingPhoto;
-  document.getElementById("cancelProfileButton").hidden=false;
+  document.getElementById("profileBackButton").hidden=false;
   document.getElementById("profileGate").hidden=false;
   document.getElementById("appContent").hidden=true;
   window.scrollTo(0,0);
