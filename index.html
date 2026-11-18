@@ -70,9 +70,66 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 .profile-check input{width:auto;margin:0}
 .profile-help{font-size:12px;color:#657187;line-height:1.5}
 @media(max-width:420px){.payment-item{padding:19px 17px;border-radius:24px}.payment-amount{font-size:31px}.payment-date-row{font-size:16px}.payment-detail{font-size:16px}.profile-edit{padding:8px 10px}}
+
+/* Écran de verrouillage */
+.security-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:22px;background:radial-gradient(circle at 15% 10%,#315b8b 0,#172f50 38%,#0c192c 100%);overflow-y:auto}
+.security-panel{width:100%;max-width:420px;background:#fff;border-radius:26px;padding:34px 28px 25px;box-shadow:0 28px 80px #0005;text-align:center}
+.security-brand-mark{width:68px;height:68px;border-radius:22px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;font-size:31px;background:linear-gradient(145deg,#eaf2ff,#d8e7fb);box-shadow:inset 0 1px 0 #fff}
+.security-eyebrow{font-size:10px;font-weight:800;letter-spacing:2px;color:#6681a3}
+.security-panel h1{font-size:27px;color:#142d4d;margin:9px 0 7px}
+.security-subtitle{font-size:14px;line-height:1.5;color:#718096;margin:0 0 25px}
+.security-panel form{text-align:left}
+.security-panel label{display:block;font-size:13px;color:#263a55;font-weight:700;margin:14px 0 8px}
+.security-input-wrap{position:relative}
+.security-input-wrap input{width:100%;padding:14px 82px 14px 14px;border:1px solid #d9e2ef;border-radius:12px;background:#f9fbfe;font-size:15px;outline:none}
+.security-input-wrap input:focus{border-color:#3269a5;box-shadow:0 0 0 3px #3269a51c}
+.security-eye{position:absolute;right:7px;top:7px;width:auto;margin:0;padding:7px 9px;border-radius:8px;background:#eaf0f8;color:#31577f;font-size:11px}
+.security-hint{font-size:12px;color:#8290a3;margin:9px 1px 0;line-height:1.45}
+.security-error{font-size:12px;color:#b42318;background:#fff0ef;border-radius:9px;padding:10px 12px;margin:12px 0 0;line-height:1.45}
+.security-submit{background:#123c69;color:white;border-radius:12px;padding:15px;margin-top:20px;box-shadow:0 7px 16px #123c6926}
+.security-submit:active{transform:translateY(1px)}
+.security-footer{border-top:1px solid #edf0f5;margin-top:24px;padding-top:17px;color:#8793a4;font-size:11px}
+.security-footer span{color:#3d79b6;margin-right:5px}
+.password-settings{margin-top:18px}
+.password-settings .payment-form{margin-top:10px}
+@media(max-width:420px){.security-panel{padding:29px 22px 22px;border-radius:22px}.security-panel h1{font-size:24px}}
+
 </style>
 </head>
 <body>
+
+<section id="securityGate" class="security-gate" aria-live="polite">
+  <div class="security-panel">
+    <div class="security-brand-mark">🔐</div>
+    <div class="security-eyebrow">ESPACE PERSONNEL SÉCURISÉ</div>
+    <h1>Mon Émargement</h1>
+    <p class="security-subtitle" id="securitySubtitle">Votre espace de travail vous attend.</p>
+
+    <form id="securityForm" onsubmit="handleSecuritySubmit(event)">
+      <div id="securityPasswordGroup">
+        <label for="securityPassword">Mot de passe</label>
+        <div class="security-input-wrap">
+          <input id="securityPassword" type="password" autocomplete="current-password"
+                 placeholder="Saisis ton mot de passe" required>
+          <button class="security-eye" type="button" onclick="togglePasswordVisibility('securityPassword',this)" aria-label="Afficher ou masquer le mot de passe">Afficher</button>
+        </div>
+      </div>
+      <div id="securityConfirmGroup" hidden>
+        <label for="securityConfirm">Confirmer le mot de passe</label>
+        <div class="security-input-wrap">
+          <input id="securityConfirm" type="password" autocomplete="new-password"
+                 placeholder="Répète ton mot de passe">
+          <button class="security-eye" type="button" onclick="togglePasswordVisibility('securityConfirm',this)" aria-label="Afficher ou masquer la confirmation">Afficher</button>
+        </div>
+      </div>
+      <p class="security-hint" id="securityHint">Utilise au moins 8 caractères.</p>
+      <p class="security-error" id="securityError" role="alert" hidden></p>
+      <button class="security-submit" id="securitySubmit" type="submit">Déverrouiller mon espace</button>
+    </form>
+    <div class="security-footer"><span>◈</span> Tes données restent enregistrées sur cet appareil</div>
+  </div>
+</section>
+
 <header>
   <h1>📘 Mon Émargement</h1>
   <p>Suivi personnel de mes heures de cours</p>
@@ -131,6 +188,22 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 <button class="primary" type="button" onclick="addSubject()">＋ Ajouter cette matière</button>
 </div>
   </section>
+
+  <section class="card password-settings">
+    <h2>🔐 Sécurité du compte</h2>
+    <p class="muted">Modifie le mot de passe demandé à l'ouverture de Mon Émargement.</p>
+    <div class="payment-form">
+      <label for="currentPassword">Mot de passe actuel</label>
+      <input id="currentPassword" type="password" autocomplete="current-password" placeholder="Mot de passe actuel">
+      <label for="newPassword">Nouveau mot de passe</label>
+      <input id="newPassword" type="password" autocomplete="new-password" placeholder="8 caractères minimum">
+      <label for="confirmNewPassword">Confirmer le nouveau mot de passe</label>
+      <input id="confirmNewPassword" type="password" autocomplete="new-password" placeholder="Répéter le nouveau mot de passe">
+      <button class="primary" type="button" onclick="changeAppPassword()">Mettre à jour le mot de passe</button>
+      <p class="small-note">Le mot de passe n'est pas enregistré en clair. Il est transformé en empreinte cryptographique sur cet appareil.</p>
+    </div>
+  </section>
+
 </section>
 
 <div id="appContent" hidden>
@@ -428,6 +501,126 @@ function saveProfile(event){
   catch(e){alert("Le profil n'a pas pu être enregistré. Essaie une photo plus légère ou retire-la. Tes séances et paiements n'ont pas été modifiés.");}
 }
 
+
+const PASSWORD_KEY="mon_emargement_password_v1";
+let securityMode="unlock";
+let securityUnlocked=false;
+
+function passwordStorage(){
+  try{
+    const raw=localStorage.getItem(PASSWORD_KEY);
+    return raw?JSON.parse(raw):null;
+  }catch(e){return null;}
+}
+function bytesToBase64(bytes){
+  let binary="";bytes.forEach(byte=>binary+=String.fromCharCode(byte));
+  return btoa(binary);
+}
+function base64ToBytes(value){
+  const binary=atob(value);
+  return Uint8Array.from(binary,char=>char.charCodeAt(0));
+}
+async function derivePasswordHash(password,salt){
+  if(!window.crypto?.subtle)throw new Error("La protection par mot de passe nécessite un navigateur sécurisé et récent. Ouvre l'application avec son adresse HTTPS.");
+  const encoder=new TextEncoder();
+  const key=await crypto.subtle.importKey("raw",encoder.encode(password),"PBKDF2",false,["deriveBits"]);
+  const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:210000,hash:"SHA-256"},key,256);
+  return new Uint8Array(bits);
+}
+function setSecurityMode(mode){
+  securityMode=mode;
+  const setup=mode==="setup";
+  document.getElementById("securitySubtitle").textContent=setup
+    ?"Crée un mot de passe pour protéger ton espace personnel."
+    :"Ton espace est verrouillé. Saisis ton mot de passe pour continuer.";
+  document.getElementById("securityConfirmGroup").hidden=!setup;
+  document.getElementById("securityHint").textContent=setup
+    ?"Choisis au moins 8 caractères, avec des lettres, des chiffres ou des symboles."
+    :"Entre le mot de passe défini sur cet appareil.";
+  document.getElementById("securitySubmit").textContent=setup?"Créer mon mot de passe":"Déverrouiller mon espace";
+  document.getElementById("securityPassword").value="";
+  document.getElementById("securityConfirm").value="";
+  document.getElementById("securityPassword").autocomplete=setup?"new-password":"current-password";
+  document.getElementById("securityError").hidden=true;
+  document.getElementById("securityGate").hidden=false;
+  setTimeout(()=>document.getElementById("securityPassword").focus(),80);
+}
+function showSecurityError(message){
+  const box=document.getElementById("securityError");box.textContent=message;box.hidden=false;
+}
+function togglePasswordVisibility(id,button){
+  const input=document.getElementById(id),visible=input.type==="password";
+  input.type=visible?"text":"password";button.textContent=visible?"Masquer":"Afficher";
+}
+async function handleSecuritySubmit(event){
+  event.preventDefault();
+  const password=document.getElementById("securityPassword").value;
+  const button=document.getElementById("securitySubmit");
+  document.getElementById("securityError").hidden=true;
+  if(securityMode==="setup"){
+    const confirmation=document.getElementById("securityConfirm").value;
+    if(password.length<8){showSecurityError("Le mot de passe doit contenir au moins 8 caractères.");return;}
+    if(password!==confirmation){showSecurityError("Les deux mots de passe ne correspondent pas.");return;}
+    button.disabled=true;button.textContent="Création en cours…";
+    try{
+      const salt=crypto.getRandomValues(new Uint8Array(16));
+      const hash=await derivePasswordHash(password,salt);
+      localStorage.setItem(PASSWORD_KEY,JSON.stringify({version:1,algorithm:"PBKDF2-SHA-256",iterations:210000,salt:bytesToBase64(salt),hash:bytesToBase64(hash),createdAt:new Date().toISOString()}));
+      unlockApplication();
+    }catch(e){showSecurityError(e.message||"Impossible de créer le mot de passe sur cet appareil.");}
+    finally{button.disabled=false;button.textContent="Créer mon mot de passe";}
+    return;
+  }
+  const saved=passwordStorage();
+  if(!saved||!saved.salt||!saved.hash){setSecurityMode("setup");return;}
+  button.disabled=true;button.textContent="Vérification…";
+  try{
+    const actual=await derivePasswordHash(password,base64ToBytes(saved.salt));
+    const expected=base64ToBytes(saved.hash);
+    let difference=actual.length^expected.length;
+    for(let i=0;i<Math.min(actual.length,expected.length);i++)difference|=actual[i]^expected[i];
+    if(difference!==0){showSecurityError("Mot de passe incorrect. Réessaie.");return;}
+    unlockApplication();
+  }catch(e){showSecurityError(e.message||"La vérification du mot de passe a échoué.");}
+  finally{button.disabled=false;button.textContent="Déverrouiller mon espace";}
+}
+function unlockApplication(){
+  securityUnlocked=true;
+  document.getElementById("securityGate").hidden=true;
+  loadProfile();
+  if(profile){
+    const available=profile.schools.filter(k=>ESTABLISHMENTS[k]);
+    if(available.length!==profile.schools.length){profile.schools=available;try{localStorage.setItem(PROFILE_KEY,JSON.stringify(profile));}catch(e){}}
+    render();
+  }
+}
+async function changeAppPassword(){
+  const current=document.getElementById("currentPassword").value;
+  const next=document.getElementById("newPassword").value;
+  const confirmNext=document.getElementById("confirmNewPassword").value;
+  const saved=passwordStorage();
+  if(!saved){alert("Aucun mot de passe n'est configuré.");return;}
+  if(!current||!next||!confirmNext){alert("Remplis les trois champs du mot de passe.");return;}
+  if(next.length<8){alert("Le nouveau mot de passe doit contenir au moins 8 caractères.");return;}
+  if(next!==confirmNext){alert("La confirmation du nouveau mot de passe ne correspond pas.");return;}
+  try{
+    const currentHash=await derivePasswordHash(current,base64ToBytes(saved.salt));
+    const expected=base64ToBytes(saved.hash);
+    let difference=currentHash.length^expected.length;
+    for(let i=0;i<Math.min(currentHash.length,expected.length);i++)difference|=currentHash[i]^expected[i];
+    if(difference!==0){alert("Le mot de passe actuel est incorrect.");return;}
+    const salt=crypto.getRandomValues(new Uint8Array(16));
+    const hash=await derivePasswordHash(next,salt);
+    localStorage.setItem(PASSWORD_KEY,JSON.stringify({version:1,algorithm:"PBKDF2-SHA-256",iterations:210000,salt:bytesToBase64(salt),hash:bytesToBase64(hash),updatedAt:new Date().toISOString()}));
+    ["currentPassword","newPassword","confirmNewPassword"].forEach(id=>document.getElementById(id).value="");
+    alert("Mot de passe mis à jour avec succès.");
+  }catch(e){alert(e.message||"Impossible de modifier le mot de passe.");}
+}
+function startSecurity(){
+  const saved=passwordStorage();
+  setSecurityMode(saved&&saved.salt&&saved.hash?"unlock":"setup");
+}
+
 function localDate(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
 document.getElementById("date").value=localDate();document.getElementById("monthFilter").value=localDate().slice(0,7);document.getElementById("paymentDate").value=localDate();
 function getHours(start,end){const [sh,sm]=start.split(":").map(Number),[eh,em]=end.split(":").map(Number);const minutes=eh*60+em-(sh*60+sm);if(minutes<=0)throw new Error("L'heure de fin doit être après le début.");return minutes/60;}
@@ -544,12 +737,7 @@ function exportCSV(){
 refreshEstablishmentSelects();
 renderEstablishments();
 renderProfileSchoolChoices();
-loadProfile();
-if(profile){
- const available=profile.schools.filter(k=>ESTABLISHMENTS[k]);
- if(available.length!==profile.schools.length){profile.schools=available;try{localStorage.setItem(PROFILE_KEY,JSON.stringify(profile));}catch(e){}}
- render();
-}
+startSecurity();
 </script>
 </body>
 </html>
