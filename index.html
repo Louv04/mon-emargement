@@ -108,6 +108,29 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
       <button class="secondary" type="button" id="cancelProfileButton" onclick="cancelProfileEdit()" hidden>Annuler</button>
     </form>
   </div>
+  <section class="card profile-management-card">
+
+<h2>Mes établissements</h2>
+<p class="muted">Gère ici tes écoles, leurs matières et leurs tarifs. Si un contrat se termine, tu peux archiver l’établissement sans perdre son historique.</p>
+<p class="muted">Ajoute tes écoles et définis un tarif horaire pour chaque matière. Les tarifs déjà enregistrés sur les anciennes séances ne seront jamais modifiés.</p>
+<div id="establishmentsList"></div>
+<div class="payment-form">
+<h3 style="margin:0 0 8px">Ajouter un établissement</h3>
+<label for="newSchoolName">Nom de l'établissement</label>
+<input id="newSchoolName" maxlength="120" placeholder="Ex. : Complexe scolaire La Réussite">
+<button class="primary" type="button" onclick="addEstablishment()">＋ Créer l'établissement</button>
+</div>
+<div class="payment-form">
+<h3 style="margin:0 0 8px">Ajouter une matière à un établissement</h3>
+<label for="subjectSchool">Établissement</label>
+<select id="subjectSchool"></select>
+<label for="newSubjectName">Nom de la matière</label>
+<input id="newSubjectName" maxlength="100" placeholder="Ex. : Physique-Chimie">
+<label for="newSubjectRate">Tarif par heure (FCFA)</label>
+<input id="newSubjectRate" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex. : 1500">
+<button class="primary" type="button" onclick="addSubject()">＋ Ajouter cette matière</button>
+</div>
+  </section>
 </section>
 
 <div id="appContent" hidden>
@@ -146,27 +169,6 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 </div>
 </section>
 
-<section class="card">
-<h2>Mes établissements</h2>
-<p class="muted">Ajoute tes écoles et définis un tarif horaire pour chaque matière. Les tarifs déjà enregistrés sur les anciennes séances ne seront jamais modifiés.</p>
-<div id="establishmentsList"></div>
-<div class="payment-form">
-<h3 style="margin:0 0 8px">Ajouter un établissement</h3>
-<label for="newSchoolName">Nom de l'établissement</label>
-<input id="newSchoolName" maxlength="120" placeholder="Ex. : Complexe scolaire La Réussite">
-<button class="primary" type="button" onclick="addEstablishment()">＋ Créer l'établissement</button>
-</div>
-<div class="payment-form">
-<h3 style="margin:0 0 8px">Ajouter une matière à un établissement</h3>
-<label for="subjectSchool">Établissement</label>
-<select id="subjectSchool"></select>
-<label for="newSubjectName">Nom de la matière</label>
-<input id="newSubjectName" maxlength="100" placeholder="Ex. : Physique-Chimie">
-<label for="newSubjectRate">Tarif par heure (FCFA)</label>
-<input id="newSubjectRate" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex. : 1500">
-<button class="primary" type="button" onclick="addSubject()">＋ Ajouter cette matière</button>
-</div>
-</section>
 
 <section class="card">
 <h2>Nouvelle séance</h2>
@@ -217,7 +219,7 @@ function normalizeEstablishments(){
     Object.keys(parsed).forEach(key=>{
      const item=parsed[key];
      if(item&&typeof item.name==="string"&&Array.isArray(item.subjects)){
-      ESTABLISHMENTS[key]={name:item.name,subjects:item.subjects.filter(s=>s&&s.id&&s.name&&Number(s.rate)>=0).map(s=>({id:String(s.id),name:String(s.name),rate:Number(s.rate)}))};
+      ESTABLISHMENTS[key]={name:item.name,active:item.active!==false,subjects:item.subjects.filter(s=>s&&s.id&&s.name&&Number(s.rate)>=0).map(s=>({id:String(s.id),name:String(s.name),rate:Number(s.rate)}))};
      }
     });
    }
@@ -225,18 +227,19 @@ function normalizeEstablishments(){
  }catch(e){alert("Les paramètres des établissements n'ont pas pu être lus. Les établissements de base restent disponibles.");}
 }
 function saveEstablishments(){
- const data={};Object.keys(ESTABLISHMENTS).forEach(k=>data[k]={name:ESTABLISHMENTS[k].name,subjects:ESTABLISHMENTS[k].subjects});
+ const data={};Object.keys(ESTABLISHMENTS).forEach(k=>data[k]={name:ESTABLISHMENTS[k].name,active:ESTABLISHMENTS[k].active!==false,subjects:ESTABLISHMENTS[k].subjects});
  localStorage.setItem(ESTABLISHMENTS_KEY,JSON.stringify(data));
 }
 normalizeEstablishments();
 function firstSubject(key){return ESTABLISHMENTS[key]?.subjects?.[0]||null;}
-function establishmentOptions(){return Object.entries(ESTABLISHMENTS).map(([k,v])=>`<option value="${escapeHTML(k)}">${escapeHTML(v.name)}</option>`).join("");}
+function establishmentOptions(activeOnly=false){return Object.entries(ESTABLISHMENTS).filter(([k,v])=>!activeOnly||v.active!==false).map(([k,v])=>`<option value="${escapeHTML(k)}">${escapeHTML(v.name)}${v.active===false?" (archivé)":""}</option>`).join("");}
 function refreshEstablishmentSelects(){
  const summary=document.getElementById("summaryEstablishment"),session=document.getElementById("establishment");
  const oldSummary=summary.value||"pierre",oldSession=session.value||"pierre";
- summary.innerHTML=establishmentOptions();session.innerHTML=establishmentOptions();
- summary.value=ESTABLISHMENTS[oldSummary]?oldSummary:Object.keys(ESTABLISHMENTS)[0];
- session.value=ESTABLISHMENTS[oldSession]?oldSession:Object.keys(ESTABLISHMENTS)[0];
+ summary.innerHTML=establishmentOptions(false);session.innerHTML=establishmentOptions(true);
+ const allKeys=Object.keys(ESTABLISHMENTS),activeKeys=allKeys.filter(k=>ESTABLISHMENTS[k].active!==false);
+ summary.value=ESTABLISHMENTS[oldSummary]?oldSummary:(allKeys[0]||"");
+ session.value=ESTABLISHMENTS[oldSession]?.active!==false&&ESTABLISHMENTS[oldSession]?oldSession:(activeKeys[0]||"");
  updateEstablishmentInfo();renderProfileSchoolChoices();
 }
 let sessions=[],payments=[],profile=null,pendingPhoto=null;
@@ -259,23 +262,65 @@ try{
 
 function renderProfileSchoolChoices(selected=[]){
  const box=document.getElementById("profileSchools");if(!box)return;
- box.innerHTML=Object.entries(ESTABLISHMENTS).map(([key,e])=>`<label class="profile-check"><input type="checkbox" value="${escapeHTML(key)}" ${selected.includes(key)?"checked":""}> ${escapeHTML(e.name)}</label>`).join("");
+ const active=Object.entries(ESTABLISHMENTS).filter(([key,e])=>e.active!==false);
+ box.innerHTML=active.length?active.map(([key,e])=>`<label class="profile-check"><input type="checkbox" value="${escapeHTML(key)}" ${selected.includes(key)?"checked":""}> ${escapeHTML(e.name)}</label>`).join(""):'<p class="muted">Aucun établissement actif. Ajoute-en un ci-dessous pour pouvoir le sélectionner.</p>';
 }
 function renderEstablishments(){
  const list=document.getElementById("establishmentsList"),subjectSchool=document.getElementById("subjectSchool");
  if(!list||!subjectSchool)return;
- list.innerHTML=Object.entries(ESTABLISHMENTS).map(([key,e])=>`<div class="session">
- <h3>${escapeHTML(e.name)}</h3>
- ${e.subjects.length?e.subjects.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><p style="margin:8px 0">${escapeHTML(s.name)} — <strong>${money(s.rate)}/h</strong></p><button class="secondary" style="width:auto;margin:4px 0;padding:8px 10px;font-size:13px" type="button" onclick="changeSubjectRate('${escapeHTML(key)}','${escapeHTML(s.id)}')">Modifier le tarif</button></div>`).join(""):'<p class="muted">Aucune matière configurée.</p>'}
- </div>`).join("");
- const previous=subjectSchool.value;subjectSchool.innerHTML=establishmentOptions();if(ESTABLISHMENTS[previous])subjectSchool.value=previous;
+ list.innerHTML=Object.entries(ESTABLISHMENTS).map(([key,e])=>{
+  const archived=e.active===false;
+  const hasHistory=sessions.some(item=>item.establishment===key)||payments.some(item=>item.establishment===key);
+  const status=archived?'<span class="muted" style="font-weight:700"> · Archivé</span>':'';
+  const subjects=e.subjects.length?e.subjects.map(subject=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><p style="margin:8px 0">${escapeHTML(subject.name)} — <strong>${money(subject.rate)}/h</strong></p>${!archived?`<button class="secondary" style="width:auto;margin:4px 0;padding:8px 10px;font-size:13px" type="button" onclick="changeSubjectRate('${escapeHTML(key)}','${escapeHTML(subject.id)}')">Modifier le tarif</button>`:''}</div>`).join(""):'<p class="muted">Aucune matière configurée.</p>';
+  const action=archived
+   ?`<button class="secondary" style="width:auto;margin:8px 6px 0 0" type="button" onclick="reactivateEstablishment('${escapeHTML(key)}')">Réactiver</button>`
+   :`<button class="secondary" style="width:auto;margin:8px 6px 0 0" type="button" onclick="deleteEstablishment('${escapeHTML(key)}')">Supprimer</button>`;
+  const note=archived?'<p class="profile-help">Cet établissement est archivé. Ses anciennes séances, paiements et soldes restent consultables dans le résumé.</p>':(hasHistory?'<p class="profile-help">Des données existent : la suppression l’archivera sans effacer les historiques.</p>':'');
+  return `<div class="session"><h3>${escapeHTML(e.name)}${status}</h3>${subjects}${note}${action}</div>`;
+ }).join("")||'<p class="muted">Aucun établissement enregistré pour le moment.</p>';
+ const previous=subjectSchool.value;
+ subjectSchool.innerHTML=establishmentOptions(true);
+ if(ESTABLISHMENTS[previous]?.active!==false&&ESTABLISHMENTS[previous])subjectSchool.value=previous;
+}
+function deleteEstablishment(key){
+ const establishment=ESTABLISHMENTS[key];if(!establishment)return;
+ const hasSessions=sessions.some(item=>item.establishment===key);
+ const hasPayments=payments.some(item=>item.establishment===key);
+ if(hasSessions||hasPayments){
+  const detail=[hasSessions?"des séances":"",hasPayments?"des paiements":""].filter(Boolean).join(" et ");
+  if(!confirm(`${establishment.name} contient ${detail}. L'établissement sera archivé, mais toutes les séances, tous les paiements et les soldes seront conservés. Confirmer ?`))return;
+  const oldActive=establishment.active;
+  establishment.active=false;
+  try{saveEstablishments();refreshEstablishmentSelects();renderEstablishments();render();alert("Établissement archivé. Son historique et son solde restent accessibles dans le résumé.");}
+  catch(e){establishment.active=oldActive;alert("Impossible d'archiver cet établissement. Aucune donnée comptable n'a été supprimée.");}
+  return;
+ }
+ if(!confirm(`Supprimer définitivement ${establishment.name} ? Cet établissement ne possède aucune séance ni aucun paiement enregistré.`))return;
+ const backup=ESTABLISHMENTS[key];
+ delete ESTABLISHMENTS[key];
+ try{
+  saveEstablishments();
+  if(profile&&Array.isArray(profile.schools)){
+   profile.schools=profile.schools.filter(item=>item!==key);
+   localStorage.setItem(PROFILE_KEY,JSON.stringify(profile));
+  }
+  refreshEstablishmentSelects();renderEstablishments();render();
+  alert("Établissement supprimé.");
+ }catch(e){ESTABLISHMENTS[key]=backup;alert("Impossible de supprimer cet établissement. Les données existantes sont conservées.");}
+}
+function reactivateEstablishment(key){
+ const establishment=ESTABLISHMENTS[key];if(!establishment)return;
+ establishment.active=true;
+ try{saveEstablishments();refreshEstablishmentSelects();renderEstablishments();render();alert("Établissement réactivé. Tu peux de nouveau enregistrer des séances.");}
+ catch(e){establishment.active=false;alert("Impossible de réactiver cet établissement.");}
 }
 function addEstablishment(){
  const name=document.getElementById("newSchoolName").value.trim();
  if(!name){alert("Saisis le nom de l'établissement.");return;}
  if(Object.values(ESTABLISHMENTS).some(e=>e.name.toLocaleLowerCase()===name.toLocaleLowerCase())){alert("Cet établissement existe déjà.");return;}
  const key="school-"+Date.now();
- ESTABLISHMENTS[key]={name,subjects:[]};
+ ESTABLISHMENTS[key]={name,active:true,subjects:[]};
  try{saveEstablishments();document.getElementById("newSchoolName").value="";refreshEstablishmentSelects();renderEstablishments();render();alert("Établissement ajouté.");}
  catch(e){delete ESTABLISHMENTS[key];alert("Impossible d'enregistrer cet établissement dans le navigateur.");}
 }
@@ -317,7 +362,7 @@ function showProfileGate(){
 function loadProfile(){
   try{const raw=localStorage.getItem(PROFILE_KEY);profile=raw?JSON.parse(raw):null;}
   catch(e){alert("Le profil enregistré ne peut pas être lu. Tes séances et paiements restent intacts.");profile=null;}
-  if(!profile||!profile.name||!Array.isArray(profile.schools)||!profile.schools.length){showProfileGate();return;}
+  if(!profile||!profile.name||!Array.isArray(profile.schools)){showProfileGate();return;}
   displayProfile();
 }
 function displayProfile(){
@@ -394,6 +439,7 @@ function updateEstablishmentInfo(){
 }
 function saveSession(){
  const date=document.getElementById("date").value,arrival=document.getElementById("arrival").value,key=document.getElementById("establishment").value,e=ESTABLISHMENTS[key],chosen=selectedSubject(key),className=document.getElementById("className").value.trim(),start=document.getElementById("start").value,end=document.getElementById("end").value,signed=document.getElementById("signed").checked,notes=document.getElementById("notes").value.trim();
+ if(!e||e.active===false){alert("Sélectionne un établissement actif pour enregistrer une nouvelle séance.");return;}
  if(!date||!className||!start||!end){alert("Remplis la date, la classe et les horaires du cours.");return;}
  if(!chosen){alert("Ajoute ou sélectionne une matière pour cet établissement.");return;}
  let hours;try{hours=getHours(start,end);}catch(err){alert(err.message);return;}
