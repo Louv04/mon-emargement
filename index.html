@@ -7,6 +7,7 @@
 <title>Mon Émargement</title>
 <style>
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f6fa;color:#172033}
 header{background:#123c69;color:white;padding:24px 20px;border-radius:0 0 24px 24px}
 header h1{margin:0 0 8px}header p{margin:0;opacity:.85}
@@ -101,10 +102,7 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
         </div>
       </div>
       <label>Établissement(s)</label>
-      <div class="profile-checks">
-        <label class="profile-check"><input type="checkbox" id="profilePierre" value="pierre"> Pierre de Ronsard</label>
-        <label class="profile-check"><input type="checkbox" id="profileHenri" value="henri"> Henri Asnath</label>
-      </div>
+      <div class="profile-checks" id="profileSchools"></div>
       <p class="profile-help">Tu peux sélectionner un ou plusieurs établissements. Ce choix décrit ton profil et ne modifie pas les historiques existants.</p>
       <button class="primary" type="submit">Enregistrer mon profil</button>
       <button class="secondary" type="button" id="cancelProfileButton" onclick="cancelProfileEdit()" hidden>Annuler</button>
@@ -149,6 +147,28 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 </section>
 
 <section class="card">
+<h2>Mes établissements</h2>
+<p class="muted">Ajoute tes écoles et définis un tarif horaire pour chaque matière. Les tarifs déjà enregistrés sur les anciennes séances ne seront jamais modifiés.</p>
+<div id="establishmentsList"></div>
+<div class="payment-form">
+<h3 style="margin:0 0 8px">Ajouter un établissement</h3>
+<label for="newSchoolName">Nom de l'établissement</label>
+<input id="newSchoolName" maxlength="120" placeholder="Ex. : Complexe scolaire La Réussite">
+<button class="primary" type="button" onclick="addEstablishment()">＋ Créer l'établissement</button>
+</div>
+<div class="payment-form">
+<h3 style="margin:0 0 8px">Ajouter une matière à un établissement</h3>
+<label for="subjectSchool">Établissement</label>
+<select id="subjectSchool"></select>
+<label for="newSubjectName">Nom de la matière</label>
+<input id="newSubjectName" maxlength="100" placeholder="Ex. : Physique-Chimie">
+<label for="newSubjectRate">Tarif par heure (FCFA)</label>
+<input id="newSubjectRate" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex. : 1500">
+<button class="primary" type="button" onclick="addSubject()">＋ Ajouter cette matière</button>
+</div>
+</section>
+
+<section class="card">
 <h2>Nouvelle séance</h2>
 <label for="date">Date du cours</label><input type="date" id="date">
 <label for="arrival">Heure d'arrivée à l'école</label><input type="time" id="arrival">
@@ -157,7 +177,7 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 <select id="establishment" onchange="updateEstablishmentInfo()"><option value="pierre">Pierre de Ronsard</option><option value="henri">Henri Asnath</option></select>
 <div class="rate-note" id="establishmentInfo">Matière : Mathématiques · Tarif : 1 300 FCFA / heure</div>
 <label for="className">Classe</label><input id="className" placeholder="Ex. : 6e, 4e, Terminale A">
-<label for="subject">Matière</label><input id="subject" value="Mathématiques" readonly>
+<label for="subject">Matière</label><select id="subject" onchange="updateSelectedRate()"></select>
 <label for="start">Début du cours</label><input type="time" id="start">
 <label for="end">Fin du cours</label><input type="time" id="end">
 <label><input type="checkbox" id="signed" style="width:auto"> Séance signée dans le registre officiel</label>
@@ -183,7 +203,42 @@ const STORAGE_KEY="mon_emargement_sessions";
 const PAYMENTS_KEY="mon_emargement_payments";
 const MIGRATION_KEY="mon_emargement_migration_v2";
 const PROFILE_KEY="mon_emargement_profile_v1";
-const ESTABLISHMENTS={pierre:{name:"Pierre de Ronsard",subject:"Mathématiques",rate:1300},henri:{name:"Henri Asnath",subject:"Anglais",rate:1200}};
+const ESTABLISHMENTS_KEY="mon_emargement_establishments_v1";
+const ESTABLISHMENTS={
+ pierre:{name:"Pierre de Ronsard",subjects:[{id:"pierre-mathematiques",name:"Mathématiques",rate:1300}]},
+ henri:{name:"Henri Asnath",subjects:[{id:"henri-anglais",name:"Anglais",rate:1200}]}
+};
+function normalizeEstablishments(){
+ try{
+  const saved=localStorage.getItem(ESTABLISHMENTS_KEY);
+  if(saved){
+   const parsed=JSON.parse(saved);
+   if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed)){
+    Object.keys(parsed).forEach(key=>{
+     const item=parsed[key];
+     if(item&&typeof item.name==="string"&&Array.isArray(item.subjects)){
+      ESTABLISHMENTS[key]={name:item.name,subjects:item.subjects.filter(s=>s&&s.id&&s.name&&Number(s.rate)>=0).map(s=>({id:String(s.id),name:String(s.name),rate:Number(s.rate)}))};
+     }
+    });
+   }
+  }
+ }catch(e){alert("Les paramètres des établissements n'ont pas pu être lus. Les établissements de base restent disponibles.");}
+}
+function saveEstablishments(){
+ const data={};Object.keys(ESTABLISHMENTS).forEach(k=>data[k]={name:ESTABLISHMENTS[k].name,subjects:ESTABLISHMENTS[k].subjects});
+ localStorage.setItem(ESTABLISHMENTS_KEY,JSON.stringify(data));
+}
+normalizeEstablishments();
+function firstSubject(key){return ESTABLISHMENTS[key]?.subjects?.[0]||null;}
+function establishmentOptions(){return Object.entries(ESTABLISHMENTS).map(([k,v])=>`<option value="${escapeHTML(k)}">${escapeHTML(v.name)}</option>`).join("");}
+function refreshEstablishmentSelects(){
+ const summary=document.getElementById("summaryEstablishment"),session=document.getElementById("establishment");
+ const oldSummary=summary.value||"pierre",oldSession=session.value||"pierre";
+ summary.innerHTML=establishmentOptions();session.innerHTML=establishmentOptions();
+ summary.value=ESTABLISHMENTS[oldSummary]?oldSummary:Object.keys(ESTABLISHMENTS)[0];
+ session.value=ESTABLISHMENTS[oldSession]?oldSession:Object.keys(ESTABLISHMENTS)[0];
+ updateEstablishmentInfo();renderProfileSchoolChoices();
+}
 let sessions=[],payments=[],profile=null,pendingPhoto=null;
 function readArray(key,label){
   const raw=localStorage.getItem(key);if(raw===null)return [];
@@ -196,11 +251,63 @@ catch(e){alert("Impossible de lire toutes les données : "+e.message+" Aucune do
 // Toutes les séances préexistantes sont considérées impayées ; aucun paiement fictif n'est créé.
 try{
   let changed=false;
-  sessions=sessions.map(s=>{const key=ESTABLISHMENTS[s.establishment]?s.establishment:"pierre";const rate=Number(s.rate)||ESTABLISHMENTS[key].rate;if(s.establishment!==key||Number(s.rate)!==rate)changed=true;return {...s,establishment:key,rate};});
+  sessions=sessions.map(s=>{const key=ESTABLISHMENTS[s.establishment]?s.establishment:"pierre";const rate=Number(s.rate)||(firstSubject(key)?.rate||0);if(s.establishment!==key||Number(s.rate)!==rate)changed=true;return {...s,establishment:key,rate};});
   if(changed)localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));
   if(!localStorage.getItem(PAYMENTS_KEY))localStorage.setItem(PAYMENTS_KEY,"[]");
   if(!localStorage.getItem(MIGRATION_KEY))localStorage.setItem(MIGRATION_KEY,JSON.stringify({version:2,completedAt:new Date().toISOString(),legacySessionsCount:sessions.length,legacySessionsTreatedAs:"unpaid"}));
 }catch(e){alert("La préparation des données n'a pas pu être terminée. Les données d'origine sont conservées. Fais une sauvegarde avant toute nouvelle tentative.");}
+
+function renderProfileSchoolChoices(selected=[]){
+ const box=document.getElementById("profileSchools");if(!box)return;
+ box.innerHTML=Object.entries(ESTABLISHMENTS).map(([key,e])=>`<label class="profile-check"><input type="checkbox" value="${escapeHTML(key)}" ${selected.includes(key)?"checked":""}> ${escapeHTML(e.name)}</label>`).join("");
+}
+function renderEstablishments(){
+ const list=document.getElementById("establishmentsList"),subjectSchool=document.getElementById("subjectSchool");
+ if(!list||!subjectSchool)return;
+ list.innerHTML=Object.entries(ESTABLISHMENTS).map(([key,e])=>`<div class="session">
+ <h3>${escapeHTML(e.name)}</h3>
+ ${e.subjects.length?e.subjects.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><p style="margin:8px 0">${escapeHTML(s.name)} — <strong>${money(s.rate)}/h</strong></p><button class="secondary" style="width:auto;margin:4px 0;padding:8px 10px;font-size:13px" type="button" onclick="changeSubjectRate('${escapeHTML(key)}','${escapeHTML(s.id)}')">Modifier le tarif</button></div>`).join(""):'<p class="muted">Aucune matière configurée.</p>'}
+ </div>`).join("");
+ const previous=subjectSchool.value;subjectSchool.innerHTML=establishmentOptions();if(ESTABLISHMENTS[previous])subjectSchool.value=previous;
+}
+function addEstablishment(){
+ const name=document.getElementById("newSchoolName").value.trim();
+ if(!name){alert("Saisis le nom de l'établissement.");return;}
+ if(Object.values(ESTABLISHMENTS).some(e=>e.name.toLocaleLowerCase()===name.toLocaleLowerCase())){alert("Cet établissement existe déjà.");return;}
+ const key="school-"+Date.now();
+ ESTABLISHMENTS[key]={name,subjects:[]};
+ try{saveEstablishments();document.getElementById("newSchoolName").value="";refreshEstablishmentSelects();renderEstablishments();render();alert("Établissement ajouté.");}
+ catch(e){delete ESTABLISHMENTS[key];alert("Impossible d'enregistrer cet établissement dans le navigateur.");}
+}
+function changeSubjectRate(key,id){
+ const subject=ESTABLISHMENTS[key]?.subjects.find(s=>s.id===id);if(!subject)return;
+ const entered=prompt(`Nouveau tarif horaire pour ${subject.name} (FCFA) :`,String(subject.rate));
+ if(entered===null)return;
+ const rate=Number(entered.trim());
+ if(!Number.isFinite(rate)||rate<0||entered.trim()===""){alert("Saisis un tarif horaire valide.");return;}
+ const old=subject.rate;subject.rate=rate;
+ try{saveEstablishments();updateEstablishmentInfo();renderEstablishments();alert("Tarif mis à jour. Les anciennes séances conservent leur tarif d'origine.");}
+ catch(e){subject.rate=old;alert("Impossible d'enregistrer le nouveau tarif.");}
+}
+function addSubject(){
+ const key=document.getElementById("subjectSchool").value,name=document.getElementById("newSubjectName").value.trim(),rate=Number(document.getElementById("newSubjectRate").value);
+ if(!ESTABLISHMENTS[key]){alert("Sélectionne un établissement.");return;}
+ if(!name){alert("Saisis le nom de la matière.");return;}
+ if(!Number.isFinite(rate)||rate<0){alert("Saisis un tarif horaire valide.");return;}
+ if(ESTABLISHMENTS[key].subjects.some(s=>s.name.toLocaleLowerCase()===name.toLocaleLowerCase())){alert("Cette matière existe déjà dans cet établissement.");return;}
+ ESTABLISHMENTS[key].subjects.push({id:`subject-${Date.now()}`,name,rate});
+ try{saveEstablishments();document.getElementById("newSubjectName").value="";document.getElementById("newSubjectRate").value="";refreshEstablishmentSelects();renderEstablishments();render();alert("Matière et tarif ajoutés.");}
+ catch(e){ESTABLISHMENTS[key].subjects.pop();alert("Impossible d'enregistrer cette matière.");}
+}
+function selectedSubject(key){
+ const id=document.getElementById("subject").value;
+ return ESTABLISHMENTS[key]?.subjects.find(s=>s.id===id)||firstSubject(key);
+}
+function updateSelectedRate(){
+ const key=document.getElementById("establishment").value,s=selectedSubject(key);
+ const info=document.getElementById("establishmentInfo");
+ info.textContent=s?`Matière : ${s.name} · Tarif : ${s.rate.toLocaleString("fr-FR")} FCFA / heure`:"Ajoute d'abord une matière à cet établissement.";
+}
 
 function showProfileGate(){
   document.getElementById("profileGate").hidden=false;
@@ -227,8 +334,7 @@ function editProfile(){
   document.getElementById("profileIntro").textContent="Mets à jour tes informations personnelles.";
   document.getElementById("profileName").value=profile?.name||"";
   document.getElementById("profileRole").value=profile?.role||"";
-  document.getElementById("profilePierre").checked=!!profile?.schools?.includes("pierre");
-  document.getElementById("profileHenri").checked=!!profile?.schools?.includes("henri");
+  renderProfileSchoolChoices(profile?.schools||[]);
   pendingPhoto=profile?.photo||null;
   updatePhotoPreview();
   document.getElementById("profilePhoto").value="";
@@ -269,9 +375,7 @@ function updatePhotoPreview(){
 function removeProfilePhoto(){pendingPhoto=null;document.getElementById("profilePhoto").value="";updatePhotoPreview();}
 function saveProfile(event){
   event.preventDefault();
-  const name=document.getElementById("profileName").value.trim(),role=document.getElementById("profileRole").value.trim(),schools=[];
-  if(document.getElementById("profilePierre").checked)schools.push("pierre");
-  if(document.getElementById("profileHenri").checked)schools.push("henri");
+  const name=document.getElementById("profileName").value.trim(),role=document.getElementById("profileRole").value.trim(),schools=[...document.querySelectorAll("#profileSchools input:checked")].map(x=>x.value);
   if(!name||!role){alert("Renseigne ton nom et ta fonction.");return;}
   if(!schools.length){alert("Sélectionne au moins un établissement.");return;}
   const next={name,role,schools,photo:pendingPhoto||null,updatedAt:new Date().toISOString()};
@@ -282,12 +386,18 @@ function saveProfile(event){
 function localDate(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
 document.getElementById("date").value=localDate();document.getElementById("monthFilter").value=localDate().slice(0,7);document.getElementById("paymentDate").value=localDate();
 function getHours(start,end){const [sh,sm]=start.split(":").map(Number),[eh,em]=end.split(":").map(Number);const minutes=eh*60+em-(sh*60+sm);if(minutes<=0)throw new Error("L'heure de fin doit être après le début.");return minutes/60;}
-function updateEstablishmentInfo(){const e=ESTABLISHMENTS[document.getElementById("establishment").value];document.getElementById("subject").value=e.subject;document.getElementById("establishmentInfo").textContent=`Matière : ${e.subject} · Tarif : ${e.rate.toLocaleString("fr-FR")} FCFA / heure`;}
+function updateEstablishmentInfo(){
+ const key=document.getElementById("establishment").value,e=ESTABLISHMENTS[key],select=document.getElementById("subject"),previous=select.value;
+ select.innerHTML=(e?.subjects||[]).map(s=>`<option value="${escapeHTML(s.id)}">${escapeHTML(s.name)} — ${s.rate.toLocaleString("fr-FR")} FCFA/h</option>`).join("");
+ if(e?.subjects.some(s=>s.id===previous))select.value=previous;
+ updateSelectedRate();
+}
 function saveSession(){
- const date=document.getElementById("date").value,arrival=document.getElementById("arrival").value,key=document.getElementById("establishment").value,e=ESTABLISHMENTS[key],className=document.getElementById("className").value.trim(),start=document.getElementById("start").value,end=document.getElementById("end").value,signed=document.getElementById("signed").checked,notes=document.getElementById("notes").value.trim();
+ const date=document.getElementById("date").value,arrival=document.getElementById("arrival").value,key=document.getElementById("establishment").value,e=ESTABLISHMENTS[key],chosen=selectedSubject(key),className=document.getElementById("className").value.trim(),start=document.getElementById("start").value,end=document.getElementById("end").value,signed=document.getElementById("signed").checked,notes=document.getElementById("notes").value.trim();
  if(!date||!className||!start||!end){alert("Remplis la date, la classe et les horaires du cours.");return;}
+ if(!chosen){alert("Ajoute ou sélectionne une matière pour cet établissement.");return;}
  let hours;try{hours=getHours(start,end);}catch(err){alert(err.message);return;}
- sessions.push({id:Date.now(),date,arrival,establishment:key,rate:e.rate,className,subject:e.subject,start,end,hours,signed,notes});
+ sessions.push({id:Date.now(),date,arrival,establishment:key,subjectId:chosen.id,rate:chosen.rate,className,subject:chosen.name,start,end,hours,signed,notes});
  localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));["className","arrival","start","end","notes"].forEach(id=>document.getElementById(id).value="");document.getElementById("signed").checked=false;document.getElementById("summaryEstablishment").value=key;render();alert("Séance enregistrée !");
 }
 function escapeHTML(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
@@ -311,11 +421,11 @@ function paymentPeriod(payment){
 }
 function establishmentKey(){return document.getElementById("summaryEstablishment").value;}
 function getVisibleSessions(){const month=document.getElementById("monthFilter").value,key=establishmentKey();return sessions.filter(s=>s.establishment===key&&(!month||s.date.startsWith(month)));}
-function sessionAmount(s){const rate=Number(s.rate)||ESTABLISHMENTS[s.establishment].rate;return Math.round(Number(s.hours||0)*rate);}
+function sessionAmount(s){const rate=Number(s.rate)||(firstSubject(s.establishment)?.rate||0);return Math.round(Number(s.hours||0)*rate);}
 function getPaidBySession(){const paid={};payments.forEach(p=>(p.allocations||[]).forEach(a=>{paid[a.sessionId]=(paid[a.sessionId]||0)+Number(a.amount||0);}));return paid;}
 function getFinancialSummary(key){
  const paidBySession=getPaidBySession(),relevant=sessions.filter(s=>s.establishment===key);let earned=0,paid=0,remaining=0,unpaidHours=0;
- relevant.forEach(s=>{const amount=sessionAmount(s),already=Math.min(amount,paidBySession[s.id]||0),left=Math.max(0,amount-already),rate=Number(s.rate)||ESTABLISHMENTS[key].rate;earned+=amount;paid+=already;remaining+=left;if(rate>0)unpaidHours+=left/rate;});
+ relevant.forEach(s=>{const amount=sessionAmount(s),already=Math.min(amount,paidBySession[s.id]||0),left=Math.max(0,amount-already),rate=Number(s.rate)||(firstSubject(key)?.rate||0);earned+=amount;paid+=already;remaining+=left;if(rate>0)unpaidHours+=left/rate;});
  const received=payments.filter(p=>p.establishment===key).reduce((sum,p)=>sum+Number(p.amount||0),0);return {earned,paid,remaining,unpaidHours,received};
 }
 function togglePaymentForm(force){
@@ -353,13 +463,13 @@ function renderPayments(key){
 }
 function render(){
  const key=establishmentKey(),e=ESTABLISHMENTS[key],month=document.getElementById("monthFilter").value,filtered=getVisibleSessions(),hours=filtered.reduce((a,s)=>a+Number(s.hours||0),0),pay=filtered.reduce((a,s)=>a+sessionAmount(s),0),financial=getFinancialSummary(key);
- document.getElementById("totalHours").textContent=hours.toFixed(2)+" h";document.getElementById("totalPay").textContent=money(pay);document.getElementById("rateSummary").textContent=`${e.name} — ${e.rate.toLocaleString("fr-FR")} FCFA par heure de cours réellement dispensée.`;
+ document.getElementById("totalHours").textContent=hours.toFixed(2)+" h";document.getElementById("totalPay").textContent=money(pay);document.getElementById("rateSummary").textContent=`${e.name} — les tarifs horaires dépendent de la matière choisie pour chaque séance.`;
  document.getElementById("outstandingBalance").textContent=money(financial.remaining);document.getElementById("unpaidHours").textContent=financial.unpaidHours.toFixed(2)+" h";document.getElementById("totalReceived").textContent=money(financial.received);document.getElementById("historyContext").textContent=e.name+(month?" · "+month:"");
  const history=document.getElementById("history");
  if(!filtered.length)history.innerHTML='<p class="muted">Aucune séance enregistrée pour cet établissement et ce mois.</p>';
  else{
   const groups={};filtered.forEach(s=>(groups[s.date]??=[]).push(s));
-  history.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>{const day=groups[date].sort((a,b)=>b.start.localeCompare(a.start));return `<h3 class="day-heading">${escapeHTML(formatDate(date))}</h3>`+day.map(s=>{const rate=Number(s.rate)||ESTABLISHMENTS[s.establishment].rate;return `<div class="session">
+  history.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>{const day=groups[date].sort((a,b)=>b.start.localeCompare(a.start));return `<h3 class="day-heading">${escapeHTML(formatDate(date))}</h3>`+day.map(s=>{const rate=Number(s.rate)||(firstSubject(s.establishment)?.rate||0);return `<div class="session">
 <h3>${escapeHTML(s.className)} — ${escapeHTML(s.subject)}</h3>
 <p class="muted">${escapeHTML(ESTABLISHMENTS[s.establishment].name)}</p>
 <p>${escapeHTML(s.start)} – ${escapeHTML(s.end)} (${Number(s.hours).toFixed(2)} h)</p>
@@ -381,13 +491,19 @@ function deleteSession(id){
 function exportCSV(){
  const key=establishmentKey(),e=ESTABLISHMENTS[key],month=document.getElementById("monthFilter").value,selected=getVisibleSessions().slice().sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start));
  if(!selected.length){alert("Aucune séance à exporter pour cet établissement et ce mois.");return;}
- const rows=[["Date","Jour","Établissement","Arrivée","Classe","Matière","Début","Fin","Heures","Tarif horaire FCFA","Montant FCFA","Signée","Observations"],...selected.map(s=>[s.date,formatDate(s.date),ESTABLISHMENTS[s.establishment].name,s.arrival||"",s.className,s.subject,s.start,s.end,Number(s.hours).toFixed(2),Number(s.rate)||ESTABLISHMENTS[s.establishment].rate,sessionAmount(s),s.signed?"Oui":"Non",s.notes||""])];
+ const rows=[["Date","Jour","Établissement","Arrivée","Classe","Matière","Début","Fin","Heures","Tarif horaire FCFA","Montant FCFA","Signée","Observations"],...selected.map(s=>[s.date,formatDate(s.date),ESTABLISHMENTS[s.establishment].name,s.arrival||"",s.className,s.subject,s.start,s.end,Number(s.hours).toFixed(2),Number(s.rate)||(firstSubject(s.establishment)?.rate||0),sessionAmount(s),s.signed?"Oui":"Non",s.notes||""])];
  const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r\n"),blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob),link=document.createElement("a");
  link.href=url;link.download=`emargement-${e.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${month||"toutes-les-dates"}.csv`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-updateEstablishmentInfo();
+refreshEstablishmentSelects();
+renderEstablishments();
+renderProfileSchoolChoices();
 loadProfile();
-if(profile)render();
+if(profile){
+ const available=profile.schools.filter(k=>ESTABLISHMENTS[k]);
+ if(available.length!==profile.schools.length){profile.schools=available;try{localStorage.setItem(PROFILE_KEY,JSON.stringify(profile));}catch(e){}}
+ render();
+}
 </script>
 </body>
 </html>
