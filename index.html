@@ -771,15 +771,16 @@ async function exportPDF(){
   const content=document.createElement("div");
   content.innerHTML=parsed.body.innerHTML;
   printable.appendChild(content);
-  Object.assign(printable.style,{position:"fixed",left:"-12000px",top:"0",width:"1100px",background:"#fff",zIndex:"-1"});
+  Object.assign(printable.style,{position:"fixed",left:"0",top:"0",width:"1100px",background:"#fff",zIndex:"2147483000",opacity:"1",pointerEvents:"none",visibility:"visible"});
   document.body.appendChild(printable);
   const filename=`Rapport_Mon_Emargement_${String(e.name).replace(/[^a-z0-9]+/gi,"_")}_${month||"Toutes_periodes"}.pdf`;
   const worker=html2pdf().set({margin:[10,9,12,9],filename,image:{type:"jpeg",quality:0.96},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff",windowWidth:1100},jsPDF:{unit:"mm",format:"a4",orientation:"landscape"},pagebreak:{mode:["css","legacy"],avoid:["tr",".stat",".signature"]}}).from(printable).toPdf();
   const blob=await worker.output("blob");
   printable.remove();
+  if(!blob || blob.size < 12000){throw new Error("Le PDF généré est anormalement léger ("+(blob?.size||0)+" octets). Aucun fichier vide ne sera partagé.");}
   const file=new File([blob],filename,{type:"application/pdf",lastModified:Date.now()});
   if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
-   await navigator.share({files:[file],title:"Rapport Mon Émargement",text:`Rapport officiel — ${e.name}`});
+   await navigator.share({files:[file],title:"Rapport Mon Émargement"});
   }else{
    const url=URL.createObjectURL(blob),link=document.createElement("a");
    link.href=url;link.download=filename;link.style.display="none";document.body.appendChild(link);link.click();link.remove();
@@ -787,6 +788,7 @@ async function exportPDF(){
    alert("Le PDF a été généré. Si le téléchargement ne démarre pas, ouvre le menu de partage du navigateur pour l'enregistrer dans Fichiers.");
   }
  }catch(error){
+  document.querySelectorAll(".pdf-export-root").forEach(node=>node.remove());
   console.error("Erreur export PDF",error);
   alert("La génération du PDF a échoué. Vérifie ta connexion Internet puis réessaie. Détail : "+(error?.message||error));
  }finally{if(button){button.disabled=false;button.textContent=oldLabel||"📄 Exporter le rapport complet en PDF";}}
