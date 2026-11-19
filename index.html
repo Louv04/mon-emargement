@@ -7,7 +7,7 @@
 <link rel="apple-touch-icon" sizes="1024x1024" href="mon-emargement-logo-1024.png?v=20261119b">
 <link rel="icon" type="image/png" href="mon-emargement-logo-1024.png?v=20261119b">
 <link rel="manifest" href="manifest.webmanifest?v=20261119b">
-<meta name="app-build" content="2026-11-19-header-logo-refine-d">
+<meta name="app-build" content="2026-11-19-profile-layout-refine-e">
 <title>Mon Émargement</title>
 <style>
 *{box-sizing:border-box}
@@ -74,6 +74,13 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 .profile-check input{width:auto;margin:0}
 .profile-help{font-size:12px;color:#657187;line-height:1.5}
 @media(max-width:420px){.payment-item{padding:19px 17px;border-radius:24px}.payment-amount{font-size:31px}.payment-date-row{font-size:16px}.payment-detail{font-size:16px}.profile-edit{padding:8px 10px}}
+/* Vue profil : conserver la hauteur du bandeau bleu même sans identité affichée */
+header.profile-mode{min-height:180px;display:flex;flex-direction:column;justify-content:flex-start}
+header.profile-mode .profile-bar{display:none!important}
+.profile-gate{margin:28px auto 24px;display:block}
+.profile-card{margin-bottom:0}
+.profile-management-card{margin-top:20px!important}
+@media(max-width:420px){header.profile-mode{min-height:180px}.profile-gate{margin:26px 12px 24px;padding:12px}.profile-management-card{margin-top:18px!important}}
 
 /* Identité visuelle officielle Mon Émargement */
 html,body{max-width:100%;overflow-x:hidden}
@@ -185,9 +192,6 @@ header{width:100%;}
           <button class="secondary" type="button" id="removePhotoButton" onclick="removeProfilePhoto()" hidden>Retirer la photo</button>
         </div>
       </div>
-      <label>Établissement(s)</label>
-      <div class="profile-checks" id="profileSchools"></div>
-      <p class="profile-help">Tu peux sélectionner un ou plusieurs établissements. Ce choix décrit ton profil et ne modifie pas les historiques existants.</p>
       <button class="primary" type="submit">Enregistrer mon profil</button>
     </form>
   </div>
@@ -460,6 +464,7 @@ function updateSelectedRate(){
 }
 
 function showProfileGate(){
+  document.querySelector("header").classList.add("profile-mode");
   document.getElementById("profileGate").hidden=false;
   document.getElementById("appContent").hidden=true;
   document.getElementById("profileBar").hidden=true;
@@ -471,6 +476,7 @@ function loadProfile(){
   displayProfile();
 }
 function displayProfile(){
+  document.querySelector("header").classList.remove("profile-mode");
   document.getElementById("profileBackButton").hidden=true;
   document.getElementById("profileGate").hidden=true;
   document.getElementById("appContent").hidden=false;
@@ -485,12 +491,13 @@ function editProfile(){
   document.getElementById("profileIntro").textContent="Mets à jour tes informations personnelles.";
   document.getElementById("profileName").value=profile?.name||"";
   document.getElementById("profileRole").value=profile?.role||"";
-  renderProfileSchoolChoices(profile?.schools||[]);
   pendingPhoto=profile?.photo||null;
   updatePhotoPreview();
   document.getElementById("profilePhoto").value="";
   document.getElementById("removePhotoButton").hidden=!pendingPhoto;
   document.getElementById("profileBackButton").hidden=false;
+  document.getElementById("profileBar").hidden=true;
+  document.querySelector("header").classList.add("profile-mode");
   document.getElementById("profileGate").hidden=false;
   document.getElementById("appContent").hidden=true;
   window.scrollTo(0,0);
@@ -526,9 +533,10 @@ function updatePhotoPreview(){
 function removeProfilePhoto(){pendingPhoto=null;document.getElementById("profilePhoto").value="";updatePhotoPreview();}
 function saveProfile(event){
   event.preventDefault();
-  const name=document.getElementById("profileName").value.trim(),role=document.getElementById("profileRole").value.trim(),schools=[...document.querySelectorAll("#profileSchools input:checked")].map(x=>x.value);
+  const name=document.getElementById("profileName").value.trim(),role=document.getElementById("profileRole").value.trim();
   if(!name||!role){alert("Renseigne ton nom et ta fonction.");return;}
-  if(!schools.length){alert("Sélectionne au moins un établissement.");return;}
+  // Compatibilité avec les profils existants : la sélection d'établissements n'est plus demandée dans le profil.
+  const schools=Array.isArray(profile?.schools)?profile.schools:Object.keys(ESTABLISHMENTS);
   const next={name,role,schools,photo:pendingPhoto||null,updatedAt:new Date().toISOString()};
   try{localStorage.setItem(PROFILE_KEY,JSON.stringify(next));profile=next;displayProfile();window.scrollTo(0,0);}
   catch(e){alert("Le profil n'a pas pu être enregistré. Essaie une photo plus légère ou retire-la. Tes séances et paiements n'ont pas été modifiés.");}
