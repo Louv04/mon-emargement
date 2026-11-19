@@ -756,54 +756,79 @@ async function exportPDF(){
  <section class="section"><h2>03 · Bilan financier global</h2><p class="section-note">Calcul établi sur l'ensemble des séances et paiements enregistrés pour cet établissement, sans mélanger les comptes d'autres établissements.</p><div class="stats"><div class="stat"><span>Total gagné</span><strong>${money(summary.earned)}</strong></div><div class="stat"><span>Total payé / affecté aux séances</span><strong>${money(summary.paid)}</strong></div><div class="stat balance"><span>Solde restant dû</span><strong>${money(summary.remaining)}</strong></div></div><p class="small">Heures correspondant au solde restant : ${summary.unpaidHours.toFixed(2)} h. Les paiements sont affectés aux séances impayées les plus anciennes.</p></section>
  <div class="signature"><div>Signature / Cachet de l'établissement</div></div><footer class="foot"><span>Mon Émargement · Document généré depuis les données enregistrées sur cet appareil</span><span>Page imprimable au format A4</span></footer>
  </body></html>`;
- // Génération directe du PDF : aucune fenêtre secondaire ni appel à window.print().
+ // PDF natif : texte et tableaux vectoriels, sans capture d'écran HTML/canvas.
  const button=document.querySelector('button[onclick="exportPDF()"]');
  const oldLabel=button?.textContent;
- if(button){button.disabled=true;button.textContent="Génération du PDF…";}
+ if(button){button.disabled=true;button.textContent="Préparation du PDF…";}
  try{
-  await loadHtml2PdfLibrary();
-  const parsed=new DOMParser().parseFromString(html,"text/html");
-  const printable=document.createElement("div");
-  printable.className="pdf-export-root";
-  const style=document.createElement("style");
-  style.textContent=parsed.querySelector("style")?.textContent||"";
-  printable.appendChild(style);
-  const content=document.createElement("div");
-  content.innerHTML=parsed.body.innerHTML;
-  printable.appendChild(content);
-  Object.assign(printable.style,{position:"fixed",left:"0",top:"0",width:"1100px",background:"#fff",zIndex:"2147483000",opacity:"1",pointerEvents:"none",visibility:"visible"});
-  document.body.appendChild(printable);
-  const filename=`Rapport_Mon_Emargement_${String(e.name).replace(/[^a-z0-9]+/gi,"_")}_${month||"Toutes_periodes"}.pdf`;
-  const worker=html2pdf().set({margin:[10,9,12,9],filename,image:{type:"jpeg",quality:0.96},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff",windowWidth:1100},jsPDF:{unit:"mm",format:"a4",orientation:"landscape"},pagebreak:{mode:["css","legacy"],avoid:["tr",".stat",".signature"]}}).from(printable).toPdf();
-  const blob=await worker.output("blob");
-  printable.remove();
-  if(!blob || blob.size < 12000){throw new Error("Le PDF généré est anormalement léger ("+(blob?.size||0)+" octets). Aucun fichier vide ne sera partagé.");}
-  const file=new File([blob],filename,{type:"application/pdf",lastModified:Date.now()});
-  if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+  await loadJsPDFLibrary();
+  const {jsPDF}=window.jspdf||{};
+  if(!jsPDF)throw new Error("Le moteur PDF n'a pas pu être initialisé.");
+  const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4",compress:true});
+  const pageW=doc.internal.pageSize.getWidth(),pageH=doc.internal.pageSize.getHeight(),margin=12;
+  const navy=[20,43,74],muted=[101,114,135],pale=[234,240,246],green=[33,128,75];
+  const text=(v)=>String(v??"");
+  const title=`Rapport_Mon_Emargement_${String(e.name).replace(/[^a-z0-9]+/gi,"_")}_${month||"Toutes_periodes"}.pdf`;
+  // En-tête du rapport
+  doc.setFillColor(...navy);doc.roundedRect(margin,10,pageW-2*margin,31,3,3,"F");
+  doc.setTextColor(197,213,232);doc.setFont("helvetica","bold");doc.setFontSize(9);doc.text("MON ÉMARGEMENT · RAPPORT OFFICIEL",margin+7,18);
+  doc.setTextColor(255,255,255);doc.setFontSize(20);doc.text("Rapport d'activité et financier",margin+7,28);
+  doc.setFont("helvetica","normal");doc.setFontSize(10);doc.text(`${e.name} · ${monthLabel}`,margin+7,35);
+  let y=49;
+  doc.setTextColor(23,32,51);doc.setFont("helvetica","bold");doc.setFontSize(9);doc.text("Enseignant :",margin,y);
+  doc.setFont("helvetica","normal");doc.text(`${profileName}${profileRole?" · "+profileRole:""}`,margin+24,y);
+  doc.setFont("helvetica","bold");doc.text("Établissement :",margin,y+6);
+  doc.setFont("helvetica","normal");doc.text(e.name,margin+27,y+6);
+  doc.setTextColor(...muted);doc.text(`Document édité le ${formatDate(localDate())}`,pageW-margin,y,{align:"right"});
+  y+=15;
+  const statW=(pageW-2*margin-8)/3;
+  const stat=(x,label,value,color=navy)=>{doc.setDrawColor(220,228,238);doc.setFillColor(248,250,252);doc.roundedRect(x,y,statW,19,2,2,"FD");doc.setTextColor(...muted);doc.setFont("helvetica","normal");doc.setFontSize(7);doc.text(label.toUpperCase(),x+4,y+6);doc.setTextColor(...color);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text(value,x+4,y+14);};
+  stat(margin,"Rémunération des séances · période",money(sessionTotal));
+  stat(margin+statW+4,"Heures effectuées · période",`${sessionHours.toFixed(2)} h`);
+  stat(margin+2*(statW+4),"Solde restant dû · global",money(summary.remaining),summary.remaining>0?[180,83,9]:green);
+  y+=27;
+  const sectionTitle=(label)=>{if(y>pageH-28){doc.addPage();y=16;}doc.setTextColor(...navy);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text(label,margin,y);doc.setDrawColor(217,227,239);doc.setLineWidth(.6);doc.line(margin,y+2,pageW-margin,y+2);y+=8;};
+  const table=(head,body,opts={})=>{
+   doc.autoTable({startY:y,head:[head],body,theme:"grid",margin:{left:margin,right:margin,bottom:17},styles:{font:"helvetica",fontSize:7,cellPadding:2.2,textColor:[23,32,51],lineColor:[231,236,242],lineWidth:.15,overflow:"linebreak"},headStyles:{fillColor:pale,textColor:[35,59,89],fontStyle:"bold",fontSize:7},alternateRowStyles:{fillColor:[250,251,253]},...opts});
+   y=doc.lastAutoTable.finalY+5;
+  };
+  sectionTitle("01 · Historique des séances");
+  doc.setTextColor(...muted);doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.text(`${selected.length} séance(s) · ${monthLabel}. L'heure d'arrivée est fournie à titre de preuve et n'entre pas dans le calcul des heures rémunérées.`,margin,y);y+=4;
+  if(selected.length){table(["Date","Classe","Matière","Arrivée","Horaire du cours","Durée","Tarif/h","Montant","Signée"],selected.map(s=>[formatDate(s.date),text(s.className),text(s.subject),text(s.arrival||"—"),`${text(s.start)} – ${text(s.end)}`,`${Number(s.hours||0).toFixed(2)} h`,money(Number(s.rate)||(firstSubject(s.establishment)?.rate||0)),money(sessionAmount(s)),s.signed?"Oui":"Non"]));
+   doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(23,32,51);doc.text(`Total : ${sessionHours.toFixed(2)} h`,pageW-margin-48,y,{align:"right"});doc.text(money(sessionTotal),pageW-margin,y,{align:"right"});y+=9;
+  }else{doc.setFontSize(8);doc.text("Aucune séance enregistrée pour cette période.",margin,y);y+=8;}
+  sectionTitle("02 · Historique des paiements");
+  doc.setTextColor(...muted);doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.text("Tous les paiements enregistrés pour cet établissement, toutes périodes confondues.",margin,y);y+=4;
+  if(allPayments.length){table(["Date du paiement","Heure","Payeur","Période concernée","Séances réglées","Montant reçu"],allPayments.map(p=>[formatDate(p.date),formatRecordedTime(p.recordedAt),`${text(p.payer||"—")}${p.payerSelfEntered?" (nom écrit par le payeur)":""}`,paymentPeriod(p),String((p.allocations||[]).length),money(p.amount)]));
+   doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(...green);doc.text(`Total des paiements reçus : ${money(summary.received)}`,pageW-margin,y,{align:"right"});y+=9;
+  }else{doc.setFontSize(8);doc.text("Aucun paiement enregistré pour cet établissement.",margin,y);y+=8;}
+  sectionTitle("03 · Bilan financier global");
+  table(["Total gagné","Total payé / affecté aux séances","Solde restant dû","Heures impayées"],[[money(summary.earned),money(summary.paid),money(summary.remaining),`${summary.unpaidHours.toFixed(2)} h`]],{styles:{fontSize:9,cellPadding:4},headStyles:{fontSize:7}});
+  doc.setFontSize(7);doc.setTextColor(...muted);doc.setFont("helvetica","normal");doc.text("Les paiements sont affectés aux séances impayées les plus anciennes. Les comptes des établissements sont strictement séparés.",margin,Math.min(y+2,pageH-18));
+  const pages=doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont("helvetica","normal");doc.setFontSize(7);doc.setTextColor(...muted);doc.text("Mon Émargement · Rapport généré depuis les données enregistrées sur cet appareil",margin,pageH-7);doc.text(`Page ${i}/${pages}`,pageW-margin,pageH-7,{align:"right"});}
+  const blob=doc.output("blob");
+  if(!blob||blob.size<1500)throw new Error(`Le PDF généré est incomplet (${blob?.size||0} octets).`);
+  const file=new File([blob],title,{type:"application/pdf",lastModified:Date.now()});
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
    await navigator.share({files:[file],title:"Rapport Mon Émargement"});
   }else{
-   const url=URL.createObjectURL(blob),link=document.createElement("a");
-   link.href=url;link.download=filename;link.style.display="none";document.body.appendChild(link);link.click();link.remove();
-   setTimeout(()=>URL.revokeObjectURL(url),60000);
-   alert("Le PDF a été généré. Si le téléchargement ne démarre pas, ouvre le menu de partage du navigateur pour l'enregistrer dans Fichiers.");
+   const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=title;link.style.display="none";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
   }
- }catch(error){
-  document.querySelectorAll(".pdf-export-root").forEach(node=>node.remove());
-  console.error("Erreur export PDF",error);
-  alert("La génération du PDF a échoué. Vérifie ta connexion Internet puis réessaie. Détail : "+(error?.message||error));
- }finally{if(button){button.disabled=false;button.textContent=oldLabel||"📄 Exporter le rapport complet en PDF";}}
+ }catch(error){console.error("Erreur export PDF",error);alert("La génération du PDF a échoué. Détail : "+(error?.message||error));}
+ finally{if(button){button.disabled=false;button.textContent=oldLabel||"📄 Exporter le rapport complet en PDF";}}
+
 }
-async function loadHtml2PdfLibrary(){
- if(typeof html2pdf!=="undefined")return;
- if(window.__monEmargementPdfLoading)return window.__monEmargementPdfLoading;
- window.__monEmargementPdfLoading=new Promise((resolve,reject)=>{
-  const script=document.createElement("script");
-  script.src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-  script.onload=()=>typeof html2pdf!=="undefined"?resolve():reject(new Error("Bibliothèque PDF indisponible"));
-  script.onerror=()=>reject(new Error("Impossible de charger le moteur PDF. Vérifie la connexion Internet."));
-  document.head.appendChild(script);
- });
- return window.__monEmargementPdfLoading;
+async function loadJsPDFLibrary(){
+ if(window.jspdf?.jsPDF?.API?.autoTable)return;
+ if(window.__monEmargementJsPdfLoading)return window.__monEmargementJsPdfLoading;
+ window.__monEmargementJsPdfLoading=(async()=>{
+  const load=(src)=>new Promise((resolve,reject)=>{const script=document.createElement("script");script.src=src;script.onload=resolve;script.onerror=()=>reject(new Error("Impossible de charger une bibliothèque PDF. Vérifie ta connexion Internet."));document.head.appendChild(script);});
+  if(!window.jspdf?.jsPDF)await load("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  if(!window.jspdf?.jsPDF?.API?.autoTable)await load("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js");
+  if(!window.jspdf?.jsPDF?.API?.autoTable)throw new Error("Le module de tableaux PDF est indisponible.");
+ })();
+ return window.__monEmargementJsPdfLoading;
 }
 refreshEstablishmentSelects();
 renderEstablishments();
