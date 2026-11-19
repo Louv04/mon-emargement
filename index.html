@@ -37,12 +37,12 @@ button{width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-wei
 .payment-status{background:#dff3e5;color:#278344;border-radius:22px;padding:7px 13px;font-size:13px;font-weight:600;white-space:nowrap}
 .payment-amount{display:block;color:#286d39;font-size:34px;font-weight:800;margin:0 0 22px;line-height:1.15}
 .payment-date-row{display:flex;align-items:center;gap:13px;font-size:18px;font-weight:650;color:#171717;margin:15px 0}
-.payment-date-row .payment-icon{color:#666;font-size:22px;width:25px;text-align:center;flex:none}
+.payment-date-row .payment-icon{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:10px;background:#edf3fa;color:#173b63;font-size:16px;flex:none}
 .payment-divider{border:0;border-top:1px solid #ececec;margin:28px 0 24px}
 .payment-detail{margin:0 0 17px;font-size:17px;line-height:1.45;color:#171717}
 .payment-detail strong{font-weight:700}
 .payment-success{display:flex;align-items:center;gap:12px;color:#28733d;font-size:17px;font-weight:600;margin:0}
-.payment-success-icon{font-size:22px}
+.payment-success-icon{display:inline-flex;align-items:center;justify-content:center;width:27px;height:27px;border-radius:50%;background:#e7f6ec;color:#21804b;font-size:17px;font-weight:800;flex:none}
 .payment-meta{display:none}
 footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 .small-note{font-size:12px;color:#657187;line-height:1.5}
@@ -643,6 +643,7 @@ function saveSession(){
 function escapeHTML(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function formatDate(s){const [y,m,d]=s.split("-").map(Number);return new Intl.DateTimeFormat("fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}).format(new Date(y,m-1,d));}
 function money(n){return Math.round(n).toLocaleString("fr-FR")+" FCFA";}
+function moneyPDF(n){return money(n).replace(/[\u00A0\u202F]/g," ");}
 function formatRecordedTime(iso){
  if(!iso)return "Heure non enregistrée";
  const d=new Date(iso);if(Number.isNaN(d.getTime()))return "Heure non enregistrée";
@@ -690,15 +691,15 @@ function renderPayments(key){
  container.innerHTML=list.map(p=>`<div class="payment-item">
  <div class="payment-card-head"><h3 class="payment-card-title">Paiement reçu</h3><span class="payment-status">Enregistré</span></div>
  <strong class="payment-amount">${money(p.amount)}</strong>
- <div class="payment-date-row"><span class="payment-icon"></span><span>${escapeHTML(formatDate(p.date))}</span></div>
- <div class="payment-date-row"><span class="payment-icon">◷</span><span>${escapeHTML(formatRecordedTime(p.recordedAt))}</span></div>
+ <div class="payment-date-row"><span class="payment-icon" aria-hidden="true">📅</span><span>${escapeHTML(formatDate(p.date))}</span></div>
+ <div class="payment-date-row"><span class="payment-icon" aria-hidden="true">🕒</span><span>${escapeHTML(formatRecordedTime(p.recordedAt))}</span></div>
  <hr class="payment-divider">
  ${p.payer?`<p class="payment-detail"><strong>Payeur :</strong> ${escapeHTML(p.payer)}${p.payerSelfEntered?' <span class="muted">(nom écrit par le payeur)</span>':''}</p>`:""}
  <p class="payment-detail"><strong>Période concernée :</strong> ${escapeHTML(paymentPeriod(p))}</p>
  <p class="payment-detail"><strong>Répartition :</strong> ${(p.allocations||[]).length} séances réglées</p>
  <p class="payment-detail"><strong>Établissement :</strong> ${escapeHTML(ESTABLISHMENTS[p.establishment]?.name||p.establishment||"Établissement non précisé")}</p>
  <hr class="payment-divider">
- <p class="payment-success"><span class="payment-success-icon">ⓥ</span><span>Paiement enregistré avec succès</span></p>
+ <p class="payment-success"><span class="payment-success-icon" aria-hidden="true">✓</span><span>Paiement enregistré avec succès</span></p>
  </div>`).join("");
 }
 function render(){
@@ -783,9 +784,9 @@ async function exportPDF(){
   y+=15;
   const statW=(pageW-2*margin-8)/3;
   const stat=(x,label,value,color=navy)=>{doc.setDrawColor(220,228,238);doc.setFillColor(248,250,252);doc.roundedRect(x,y,statW,19,2,2,"FD");doc.setTextColor(...muted);doc.setFont("helvetica","normal");doc.setFontSize(7);doc.text(label.toUpperCase(),x+4,y+6);doc.setTextColor(...color);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text(value,x+4,y+14);};
-  stat(margin,"Rémunération des séances · période",money(sessionTotal));
+  stat(margin,"Rémunération des séances · période",moneyPDF(sessionTotal));
   stat(margin+statW+4,"Heures effectuées · période",`${sessionHours.toFixed(2)} h`);
-  stat(margin+2*(statW+4),"Solde restant dû · global",money(summary.remaining),summary.remaining>0?[180,83,9]:green);
+  stat(margin+2*(statW+4),"Solde restant dû · global",moneyPDF(summary.remaining),summary.remaining>0?[180,83,9]:green);
   y+=27;
   const sectionTitle=(label)=>{if(y>pageH-28){doc.addPage();y=16;}doc.setTextColor(...navy);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text(label,margin,y);doc.setDrawColor(217,227,239);doc.setLineWidth(.6);doc.line(margin,y+2,pageW-margin,y+2);y+=8;};
   const table=(head,body,opts={})=>{
@@ -794,16 +795,16 @@ async function exportPDF(){
   };
   sectionTitle("01 · Historique des séances");
   doc.setTextColor(...muted);doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.text(`${selected.length} séance(s) · ${monthLabel}. L'heure d'arrivée est fournie à titre de preuve et n'entre pas dans le calcul des heures rémunérées.`,margin,y);y+=4;
-  if(selected.length){table(["Date","Classe","Matière","Arrivée","Horaire du cours","Durée","Tarif/h","Montant","Signée"],selected.map(s=>[formatDate(s.date),text(s.className),text(s.subject),text(s.arrival||"—"),`${text(s.start)} – ${text(s.end)}`,`${Number(s.hours||0).toFixed(2)} h`,money(Number(s.rate)||(firstSubject(s.establishment)?.rate||0)),money(sessionAmount(s)),s.signed?"Oui":"Non"]));
-   doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(23,32,51);doc.text(`Total : ${sessionHours.toFixed(2)} h`,pageW-margin-48,y,{align:"right"});doc.text(money(sessionTotal),pageW-margin,y,{align:"right"});y+=9;
+  if(selected.length){table(["Date","Classe","Matière","Arrivée","Horaire du cours","Durée","Tarif/h","Montant","Signée"],selected.map(s=>[formatDate(s.date),text(s.className),text(s.subject),text(s.arrival||"—"),`${text(s.start)} – ${text(s.end)}`,`${Number(s.hours||0).toFixed(2)} h`,moneyPDF(Number(s.rate)||(firstSubject(s.establishment)?.rate||0)),moneyPDF(sessionAmount(s)),s.signed?"Oui":"Non"]));
+   doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(23,32,51);doc.text(`Total : ${sessionHours.toFixed(2)} h`,pageW-margin-48,y,{align:"right"});doc.text(moneyPDF(sessionTotal),pageW-margin,y,{align:"right"});y+=9;
   }else{doc.setFontSize(8);doc.text("Aucune séance enregistrée pour cette période.",margin,y);y+=8;}
   sectionTitle("02 · Historique des paiements");
   doc.setTextColor(...muted);doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.text("Tous les paiements enregistrés pour cet établissement, toutes périodes confondues.",margin,y);y+=4;
-  if(allPayments.length){table(["Date du paiement","Heure","Payeur","Période concernée","Séances réglées","Montant reçu"],allPayments.map(p=>[formatDate(p.date),formatRecordedTime(p.recordedAt),`${text(p.payer||"—")}${p.payerSelfEntered?" (nom écrit par le payeur)":""}`,paymentPeriod(p),String((p.allocations||[]).length),money(p.amount)]));
-   doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(...green);doc.text(`Total des paiements reçus : ${money(summary.received)}`,pageW-margin,y,{align:"right"});y+=9;
+  if(allPayments.length){table(["Date du paiement","Heure","Payeur","Période concernée","Séances réglées","Montant reçu"],allPayments.map(p=>[formatDate(p.date),formatRecordedTime(p.recordedAt),`${text(p.payer||"—")}${p.payerSelfEntered?" (nom écrit par le payeur)":""}`,paymentPeriod(p),String((p.allocations||[]).length),moneyPDF(p.amount)]));
+   doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(...green);doc.text(`Total des paiements reçus : ${moneyPDF(summary.received)}`,pageW-margin,y,{align:"right"});y+=9;
   }else{doc.setFontSize(8);doc.text("Aucun paiement enregistré pour cet établissement.",margin,y);y+=8;}
   sectionTitle("03 · Bilan financier global");
-  table(["Total gagné","Total payé / affecté aux séances","Solde restant dû","Heures impayées"],[[money(summary.earned),money(summary.paid),money(summary.remaining),`${summary.unpaidHours.toFixed(2)} h`]],{styles:{fontSize:9,cellPadding:4},headStyles:{fontSize:7}});
+  table(["Total gagné","Total payé / affecté aux séances","Solde restant dû","Heures impayées"],[[moneyPDF(summary.earned),moneyPDF(summary.paid),moneyPDF(summary.remaining),`${summary.unpaidHours.toFixed(2)} h`]],{styles:{fontSize:9,cellPadding:4},headStyles:{fontSize:7}});
   doc.setFontSize(7);doc.setTextColor(...muted);doc.setFont("helvetica","normal");doc.text("Les paiements sont affectés aux séances impayées les plus anciennes. Les comptes des établissements sont strictement séparés.",margin,Math.min(y+2,pageH-18));
   const pages=doc.getNumberOfPages();
   for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont("helvetica","normal");doc.setFontSize(7);doc.setTextColor(...muted);doc.text("Mon Émargement · Rapport généré depuis les données enregistrées sur cet appareil",margin,pageH-7);doc.text(`Page ${i}/${pages}`,pageW-margin,pageH-7,{align:"right"});}
