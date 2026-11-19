@@ -263,7 +263,7 @@ footer{text-align:center;color:#657187;padding:20px;font-size:13px}
 <section class="card">
 <h2>Historique des séances</h2><p class="muted" id="historyContext"></p>
 <div id="history"></div>
-<button class="secondary" onclick="exportCSV()">Exporter cet historique en CSV</button>
+<button class="secondary" onclick="exportPDF()">📄 Exporter le rapport complet en PDF</button>
 </section>
 <section class="card">
 <h2>Historique des paiements</h2><p class="muted" id="paymentsContext"></p>
@@ -728,12 +728,37 @@ function deleteSession(id){
  if(hasPayment){alert("Cette séance a déjà reçu tout ou partie d'un paiement. Pour préserver l'historique comptable, elle ne peut pas être supprimée directement. Il faut d'abord corriger le paiement correspondant.");return;}
  if(!confirm("Supprimer cette séance ?"))return;sessions=sessions.filter(s=>Number(s.id)!==Number(id));localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions));render();
 }
-function exportCSV(){
- const key=establishmentKey(),e=ESTABLISHMENTS[key],month=document.getElementById("monthFilter").value,selected=getVisibleSessions().slice().sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start));
- if(!selected.length){alert("Aucune séance à exporter pour cet établissement et ce mois.");return;}
- const rows=[["Date","Jour","Établissement","Arrivée","Classe","Matière","Début","Fin","Heures","Tarif horaire FCFA","Montant FCFA","Signée","Observations"],...selected.map(s=>[s.date,formatDate(s.date),ESTABLISHMENTS[s.establishment].name,s.arrival||"",s.className,s.subject,s.start,s.end,Number(s.hours).toFixed(2),Number(s.rate)||(firstSubject(s.establishment)?.rate||0),sessionAmount(s),s.signed?"Oui":"Non",s.notes||""])];
- const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r\n"),blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob),link=document.createElement("a");
- link.href=url;link.download=`emargement-${e.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${month||"toutes-les-dates"}.csv`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+function exportPDF(){
+ const key=establishmentKey(),e=ESTABLISHMENTS[key],month=document.getElementById("monthFilter").value;
+ const selected=getVisibleSessions().slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.start||"").localeCompare(String(b.start||"")));
+ const allPayments=payments.filter(p=>p.establishment===key).slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
+ if(!selected.length&&!allPayments.length){alert("Aucune séance ni aucun paiement à exporter pour cet établissement.");return;}
+ const summary=getFinancialSummary(key),paidBySession=getPaidBySession();
+ const monthLabel=month?new Intl.DateTimeFormat("fr-FR",{month:"long",year:"numeric"}).format(new Date(Number(month.slice(0,4)),Number(month.slice(5,7))-1,1)):"Toutes les périodes";
+ const safe=(v)=>escapeHTML(v??"");
+ const sessionRows=selected.map(s=>{
+  const rate=Number(s.rate)||(firstSubject(s.establishment)?.rate||0),amount=sessionAmount(s),paid=Math.min(amount,paidBySession[s.id]||0),left=Math.max(0,amount-paid);
+  return `<tr><td>${safe(formatDate(s.date))}</td><td>${safe(s.className)}</td><td>${safe(s.subject)}</td><td>${safe(s.arrival||"—")}</td><td>${safe(s.start)} – ${safe(s.end)}</td><td class="num">${Number(s.hours||0).toFixed(2)} h</td><td class="num">${money(rate)}</td><td class="num">${money(amount)}</td><td>${s.signed?"Oui":"Non"}</td></tr>`;
+ }).join("");
+ const paymentRows=allPayments.map(p=>`<tr><td>${safe(formatDate(p.date))}</td><td>${safe(formatRecordedTime(p.recordedAt))}</td><td>${safe(p.payer||"—")}${p.payerSelfEntered?"<br><small>Nom écrit par le payeur</small>":""}</td><td>${safe(paymentPeriod(p))}</td><td class="num">${(p.allocations||[]).length}</td><td class="num paid">${money(p.amount)}</td></tr>`).join("");
+ const sessionHours=selected.reduce((n,s)=>n+Number(s.hours||0),0),sessionTotal=selected.reduce((n,s)=>n+sessionAmount(s),0);
+ const profileName=profile?.name||"Non renseigné",profileRole=profile?.role||"";
+ const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport financier - ${safe(e.name)}</title><style>
+ @page{size:A4;margin:15mm 13mm 17mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#172033;margin:0;font-size:10px;line-height:1.45;background:#fff}.top{background:#142b4a;color:#fff;padding:22px 24px;border-radius:9px;margin-bottom:18px}.brand{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#c5d5e8;font-weight:700}.top h1{font-size:24px;margin:7px 0 4px;letter-spacing:-.4px}.top p{margin:0;color:#dce7f3;font-size:11px}.meta{display:flex;justify-content:space-between;gap:15px;margin:0 0 18px;padding:0 2px;color:#536176}.meta strong{color:#172033}.section{margin-top:18px;break-inside:avoid}.section h2{font-size:14px;color:#142b4a;margin:0 0 8px;padding-bottom:7px;border-bottom:2px solid #d9e3ef}.section-note{color:#657287;margin:-2px 0 9px;font-size:9px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 18px}.stat{border:1px solid #dce4ee;border-radius:7px;padding:10px 11px}.stat span{display:block;color:#68778c;font-size:8px;text-transform:uppercase;letter-spacing:.5px}.stat strong{display:block;font-size:14px;color:#142b4a;margin-top:4px}.stat.emphasis{background:#f0f5fa;border-color:#cbd9e8}.stat.balance strong{color:${summary.remaining>0?'#b45309':'#21804b'}}table{width:100%;border-collapse:collapse;margin:8px 0 3px;table-layout:auto}thead{display:table-header-group}th{background:#eaf0f6;color:#233b59;font-size:8px;text-align:left;padding:8px 6px;border-bottom:1px solid #ccd7e4}td{padding:7px 6px;border-bottom:1px solid #e7ecf2;vertical-align:top;font-size:8.5px}tbody tr{break-inside:avoid}td.num,th.num{text-align:right;white-space:nowrap}.paid{color:#21804b;font-weight:700}.empty{padding:12px;background:#f7f9fb;color:#68778c;border-radius:6px}.totals{display:flex;justify-content:flex-end;gap:20px;margin-top:8px;padding:9px 10px;background:#f5f8fb;border-radius:6px;font-weight:700}.foot{margin-top:25px;padding-top:9px;border-top:1px solid #dce4ee;color:#7a8798;font-size:8px;display:flex;justify-content:space-between}.signature{margin-top:28px;display:flex;justify-content:flex-end}.signature div{width:180px;border-top:1px solid #9aa8b8;padding-top:6px;text-align:center;color:#68778c;font-size:8px}.small{font-size:8px;color:#68778c}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.top,.stat,th,.totals{ -webkit-print-color-adjust:exact;print-color-adjust:exact}button{display:none}}
+ </style></head><body>
+ <header class="top"><div class="brand">Mon Émargement · Rapport officiel</div><h1>Rapport d'activité et financier</h1><p>${safe(e.name)} · ${safe(monthLabel)}</p></header>
+ <div class="meta"><div><strong>Enseignant :</strong> ${safe(profileName)}${profileRole?" · "+safe(profileRole):""}<br><strong>Établissement :</strong> ${safe(e.name)}</div><div style="text-align:right"><strong>Document édité le</strong><br>${safe(formatDate(localDate()))}</div></div>
+ <div class="stats"><div class="stat"><span>Rémunération des séances de la période</span><strong>${money(sessionTotal)}</strong></div><div class="stat"><span>Heures effectuées sur la période</span><strong>${sessionHours.toFixed(2)} h</strong></div><div class="stat"><span>Solde restant dû · global</span><strong>${money(summary.remaining)}</strong></div></div>
+ <section class="section"><h2>01 · Historique des séances</h2><p class="section-note">${selected.length} séance(s) · ${safe(monthLabel)}. L'heure d'arrivée est fournie à titre de preuve et n'entre pas dans le calcul des heures rémunérées.</p>
+ ${selected.length?`<table><thead><tr><th>Date</th><th>Classe</th><th>Matière</th><th>Arrivée</th><th>Horaire du cours</th><th class="num">Durée</th><th class="num">Tarif/h</th><th class="num">Montant</th><th>Signée</th></tr></thead><tbody>${sessionRows}</tbody></table><div class="totals"><span>Total : ${sessionHours.toFixed(2)} h</span><span>${money(sessionTotal)}</span></div>`:'<div class="empty">Aucune séance enregistrée pour cette période.</div>'}</section>
+ <section class="section"><h2>02 · Historique des paiements</h2><p class="section-note">Tous les paiements enregistrés pour cet établissement, toutes périodes confondues.</p>
+ ${allPayments.length?`<table><thead><tr><th>Date du paiement</th><th>Heure</th><th>Payeur</th><th>Période concernée</th><th class="num">Séances réglées</th><th class="num">Montant reçu</th></tr></thead><tbody>${paymentRows}</tbody></table><div class="totals"><span>Total des paiements reçus</span><span class="paid">${money(summary.received)}</span></div>`:'<div class="empty">Aucun paiement enregistré pour cet établissement.</div>'}</section>
+ <section class="section"><h2>03 · Bilan financier global</h2><p class="section-note">Calcul établi sur l'ensemble des séances et paiements enregistrés pour cet établissement, sans mélanger les comptes d'autres établissements.</p><div class="stats"><div class="stat"><span>Total gagné</span><strong>${money(summary.earned)}</strong></div><div class="stat"><span>Total payé / affecté aux séances</span><strong>${money(summary.paid)}</strong></div><div class="stat balance"><span>Solde restant dû</span><strong>${money(summary.remaining)}</strong></div></div><p class="small">Heures correspondant au solde restant : ${summary.unpaidHours.toFixed(2)} h. Les paiements sont affectés aux séances impayées les plus anciennes.</p></section>
+ <div class="signature"><div>Signature / Cachet de l'établissement</div></div><footer class="foot"><span>Mon Émargement · Document généré depuis les données enregistrées sur cet appareil</span><span>Page imprimable au format A4</span></footer>
+ <script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),350)});<\/script></body></html>`;
+ const win=window.open("","_blank");
+ if(!win){alert("Le navigateur a bloqué l'ouverture du rapport. Autorise les fenêtres contextuelles pour Mon Émargement puis réessaie.");return;}
+ win.document.open();win.document.write(html);win.document.close();
 }
 refreshEstablishmentSelects();
 renderEstablishments();
