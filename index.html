@@ -37,7 +37,7 @@ button{width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-wei
 .payment-status{background:#dff3e5;color:#278344;border-radius:22px;padding:7px 13px;font-size:13px;font-weight:600;white-space:nowrap}
 .payment-amount{display:block;color:#286d39;font-size:34px;font-weight:800;margin:0 0 22px;line-height:1.15}
 .payment-date-row{display:flex;align-items:center;gap:13px;font-size:18px;font-weight:650;color:#171717;margin:15px 0}
-.payment-date-row .payment-icon{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:10px;background:#edf3fa;color:#173b63;font-size:16px;flex:none}
+.payment-date-row .payment-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:12px;background:linear-gradient(145deg,#eef4fb,#e2ebf6);color:#173b63;flex:none;box-shadow:inset 0 0 0 1px #d7e2ef}.payment-date-row .payment-icon svg{width:19px;height:19px;display:block;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .payment-divider{border:0;border-top:1px solid #ececec;margin:28px 0 24px}
 .payment-detail{margin:0 0 17px;font-size:17px;line-height:1.45;color:#171717}
 .payment-detail strong{font-weight:700}
@@ -691,8 +691,8 @@ function renderPayments(key){
  container.innerHTML=list.map(p=>`<div class="payment-item">
  <div class="payment-card-head"><h3 class="payment-card-title">Paiement reçu</h3><span class="payment-status">Enregistré</span></div>
  <strong class="payment-amount">${money(p.amount)}</strong>
- <div class="payment-date-row"><span class="payment-icon" aria-hidden="true">📅</span><span>${escapeHTML(formatDate(p.date))}</span></div>
- <div class="payment-date-row"><span class="payment-icon" aria-hidden="true">🕒</span><span>${escapeHTML(formatRecordedTime(p.recordedAt))}</span></div>
+ <div class="payment-date-row"><span class="payment-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M7.5 3v4M16.5 3v4M3.5 9.5h17M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01"></path></svg></span><span>${escapeHTML(formatDate(p.date))}</span></div>
+ <div class="payment-date-row"><span class="payment-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5l3.5 2"></path></svg></span><span>${escapeHTML(formatRecordedTime(p.recordedAt))}</span></div>
  <hr class="payment-divider">
  ${p.payer?`<p class="payment-detail"><strong>Payeur :</strong> ${escapeHTML(p.payer)}${p.payerSelfEntered?' <span class="muted">(nom écrit par le payeur)</span>':''}</p>`:""}
  <p class="payment-detail"><strong>Période concernée :</strong> ${escapeHTML(paymentPeriod(p))}</p>
