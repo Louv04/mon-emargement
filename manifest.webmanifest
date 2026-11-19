@@ -1,0 +1,16 @@
+{
+  "name": "Mon Émargement",
+  "short_name": "Émargement",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f3f6fa",
+  "theme_color": "#123c69",
+  "icons": [
+    {
+      "src": "mon-emargement-logo-1024.png?v=20261119b",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
